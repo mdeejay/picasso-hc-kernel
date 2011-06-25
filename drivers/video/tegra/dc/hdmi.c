@@ -145,7 +145,6 @@ static const struct fb_videomode tegra_dc_hdmi_supported_modes[] = {
 		.sync = 0,
 	},
 
-#ifdef ACER_PICASSO_SUPPORT_1080P
 	/* 1920x1080p 59.94/60hz EIA/CEA-861-B Format 16 */
 	{
 		.xres =		1920,
@@ -160,7 +159,6 @@ static const struct fb_videomode tegra_dc_hdmi_supported_modes[] = {
 		.vmode =	FB_VMODE_NONINTERLACED,
 		.sync = FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 	},
-#endif
 };
 
 struct tegra_hdmi_audio_config {
