@@ -145,6 +145,22 @@ static const struct fb_videomode tegra_dc_hdmi_supported_modes[] = {
 		.sync = 0,
 	},
 
+#ifdef CONFIG_TEGRA_ENABLE_SUPPORT_FOR_1080p_30HZ
+	/* 1920x1080p 30Hz EIA/CEA-861-B Format 34 */
+	{
+		.xres =		1920,
+		.yres =		1080,
+		.pixclock =	KHZ2PICOS(74250),
+		.hsync_len =	44,	/* h_sync_width */
+		.vsync_len =	5,	/* v_sync_width */
+		.left_margin =	148,	/* h_back_porch */
+		.upper_margin =	36,	/* v_back_porch */
+		.right_margin =	88,	/* h_front_porch */
+		.lower_margin =	4,	/* v_front_porch */
+		.vmode =	FB_VMODE_NONINTERLACED,
+		.sync = FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	},
+#else
 	/* 1920x1080p 59.94/60hz EIA/CEA-861-B Format 16 */
 	{
 		.xres =		1920,
@@ -159,6 +175,7 @@ static const struct fb_videomode tegra_dc_hdmi_supported_modes[] = {
 		.vmode =	FB_VMODE_NONINTERLACED,
 		.sync = FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 	},
+#endif
 };
 
 struct tegra_hdmi_audio_config {
@@ -544,6 +561,10 @@ static void tegra_dc_hdmi_resume(struct tegra_dc *dc)
 	unsigned long flags;
 
 	spin_lock_irqsave(&hdmi->suspend_lock, flags);
+
+	/* Fix: Bug#802909 */
+	tegra_nvhdcp_renegotiate(hdmi->nvhdcp);
+
 	hdmi->suspended = false;
 	if (hdmi->hpd_pending) {
 		if (tegra_dc_hdmi_hpd(dc))
@@ -1079,19 +1100,26 @@ static void tegra_dc_hdmi_enable(struct tegra_dc *dc)
 	_tegra_hdmi_writel(hdmi, pll1, HDMI_NV_PDISP_SOR_PLL1);
 
 	if (pll1 & SOR_PLL_PE_EN) {
+		/* Tmp set for HDMI 720p eye. */
 		_tegra_hdmi_writel(hdmi,
-				  PE_CURRENT0(0xf) |
-				  PE_CURRENT1(0xf) |
-				  PE_CURRENT2(0xf) |
-				  PE_CURRENT3(0xf),
+				  PE_CURRENT0(0x0) |
+				  PE_CURRENT1(0x0) |
+				  PE_CURRENT2(0x0) |
+				  PE_CURRENT3(0x0),
 				  HDMI_NV_PDISP_PE_CURRENT);
 	}
 
 	/* enable SOR */
-	if (dc->mode.h_active == 1080)
-		ds = DRIVE_CURRENT_13_500_mA;
-	else
-		ds = DRIVE_CURRENT_5_250_mA;
+	if (dc->mode.h_active == 1080) {
+		/* In order to fulfill VD request, Force to 24.75 mA
+		 * ds = DRIVE_CURRENT_13_500_mA;
+		 */
+		ds = DRIVE_CURRENT_24_750_mA;
+	}
+	else {
+		/* Tmp set for HDMI 720p eye. */
+		 ds = DRIVE_CURRENT_5_250_mA;
+	}
 
 	_tegra_hdmi_writel(hdmi,
 			  DRIVE_CURRENT_LANE0(ds) |
@@ -1187,6 +1215,11 @@ static void tegra_dc_hdmi_enable(struct tegra_dc *dc)
 	tegra_dc_writel(dc, GENERAL_ACT_REQ, DC_CMD_STATE_CONTROL);
 
 	tegra_nvhdcp_set_plug(hdmi->nvhdcp, 1);
+
+#ifdef DEBUG
+	if((hdmi != NULL) && (hdmi->base != NULL))
+		hdmi_dumpregs(hdmi);
+#endif
 
 }
 

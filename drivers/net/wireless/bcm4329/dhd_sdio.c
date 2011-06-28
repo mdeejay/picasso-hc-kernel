@@ -150,6 +150,8 @@
 DHD_SPINWAIT_SLEEP_INIT(sdioh_spinwait_sleep);
 extern int dhdcdc_set_ioctl(dhd_pub_t *dhd, int ifidx, uint cmd, void *buf, uint len);
 
+extern void bcmsdh_set_irq(int flag);
+
 #ifdef DHD_DEBUG
 /* Device console log buffer state */
 typedef struct dhd_console {
@@ -343,7 +345,7 @@ static const uint firstread = DHD_FIRSTREAD;
 #define HDATLEN (firstread - (SDPCM_HDRLEN))
 
 /* Retry count for register access failures */
-static const uint retry_limit = 2;
+static const uint retry_limit = 20;
 
 /* Force even SD lengths (some host controllers mess up on odd bytes) */
 static bool forcealign;
@@ -389,6 +391,8 @@ do { \
 	do { \
 		regvar = R_REG(bus->dhd->osh, regaddr); \
 	} while (bcmsdh_regfail(bus->sdh) && (++retryvar <= retry_limit)); \
+	if(retryvar > 1)  \
+		DHD_ERROR(("%s: regvar[ %d ], retryvar[ %d ], regfails[ %d ], bcmsdh_regfail[ %d ] \n",__FUNCTION__,regvar, retryvar ,bus->regfails, bcmsdh_regfail(bus->sdh))); \
 	if (retryvar) { \
 		bus->regfails += (retryvar-1); \
 		if (retryvar > retry_limit) { \
@@ -5759,7 +5763,9 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 			/* Expect app to have torn down any connection before calling */
 			/* Stop the bus, disable F2 */
 			dhd_bus_stop(bus, FALSE);
-
+#if defined(OOB_INTR_ONLY)
+			bcmsdh_set_irq(FALSE);
+#endif /* defined(OOB_INTR_ONLY) */
 			/* Clean tx/rx buffer pointers, detach from the dongle */
 			dhdsdio_release_dongle(bus, bus->dhd->osh, TRUE);
 
@@ -5795,6 +5801,7 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 					bcmerror = dhd_bus_init((dhd_pub_t *) bus->dhd, FALSE);
 					if (bcmerror == BCME_OK) {
 #if defined(OOB_INTR_ONLY)
+						bcmsdh_set_irq(TRUE);
 						dhd_enable_oob_intr(bus, TRUE);
 #endif /* defined(OOB_INTR_ONLY) */
 						bus->dhd->dongle_reset = FALSE;

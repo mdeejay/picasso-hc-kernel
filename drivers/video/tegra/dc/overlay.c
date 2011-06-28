@@ -156,19 +156,11 @@ static int tegra_overlay_set_windowattr(struct tegra_overlay_info *overlay,
 	win->out_w = flip_win->attr.out_w;
 	win->out_h = flip_win->attr.out_h;
 
-	/* crop the area out of the fb's width/height. src's rect needs
-	to be cropped to avoid un-wanted stretching cause of the dst crop.
-	The following code works only if src size is same as dst */
-	if (((win->out_x + win->out_w) > xres) && (win->out_x < xres)) {
-		win->out_w = win->w = xres - win->out_x;
-	}
+	if (((win->out_x + win->out_w) > xres) && (win->out_x < xres))
+		win->out_w = xres - win->out_x;
 
-	if (((win->out_y + win->out_h) > yres) && (win->out_y < yres)) {
-		win->out_h = win->h = yres - win->out_y;
-	}
-
-	/* hopefully this catches stretching blit */
-	WARN_ON(win->h == win->out_h && win->w == win->out_h);
+	if (((win->out_y + win->out_h) > yres) && (win->out_y < yres))
+		win->out_h = yres - win->out_y;
 
 	win->z = flip_win->attr.z;
 	win->cur_handle = flip_win->handle;

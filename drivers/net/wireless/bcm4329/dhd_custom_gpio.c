@@ -56,7 +56,9 @@ void *wifi_get_country_code(char *ccode);
 extern int sdioh_mmc_irq(int irq);
 #endif /* (BCMLXSDMMC)  */
 
+#ifdef CUSTOMER_HW3
 #include <mach/gpio.h>
+#endif
 
 /* Customer specific Host GPIO defintion  */
 static int dhd_oob_gpio_num = -1; /* GG 19 */
@@ -66,19 +68,10 @@ MODULE_PARM_DESC(dhd_oob_gpio_num, "DHD oob gpio number");
 
 int dhd_customer_oob_irq_map(unsigned long *irq_flags_ptr)
 {
-	int host_oob_irq = 0;
+	int  host_oob_irq = 0;
 
 #ifdef CUSTOMER_HW2
-	int OOB_GPIO_PIN=144;
-
-	printk("CSP -> GPIO IRQ fix !!! \n");
 	host_oob_irq = wifi_get_irq_number(irq_flags_ptr);
-
-	if(host_oob_irq < 0)
-	{
-		WL_ERROR(("%s: Can't get host IRQ pin !\n",__FUNCTION__));
-		host_oob_irq = gpio_to_irq(OOB_GPIO_PIN);
-	}
 
 #else /* for NOT  CUSTOMER_HW2 */
 #if defined(CUSTOM_OOB_GPIO_NUM)
@@ -186,6 +179,7 @@ dhd_custom_get_mac_address(unsigned char *buf)
 }
 #endif /* GET_CUSTOM_MAC_ENABLE */
 
+#define EXAMPLE_TABLE
 /* Customized Locale table : OPTIONAL feature */
 const struct cntry_locales_custom translate_custom_table[] = {
 /* Table should be filled out based on custom platform regulatory requirement */

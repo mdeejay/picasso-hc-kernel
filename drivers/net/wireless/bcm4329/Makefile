@@ -6,12 +6,17 @@ DHDCFLAGS = -DLINUX -DBCMDRIVER -DBCMDONGLEHOST -DDHDTHREAD -DBCMWPA2         \
 	-Wall -Wstrict-prototypes -Werror -DCUSTOMER_HW2 -DMMC_SDIO_ABORT     \
 	-DDHD_DEBUG_TRAP -DSOFTAP -DEMBEDDED_PLATFORM -DARP_OFFLOAD_SUPPORT   \
 	-DPKT_FILTER_SUPPORT -DSET_RANDOM_MAC_SOFTAP -DCSCAN                  \
-	-DKEEP_ALIVE -DPNO_SUPPORT                                            \
+	-DKEEP_ALIVE -DPNO_SUPPORT -DSDIO_ISR_THREAD                          \
 	-Idrivers/net/wireless/bcm4329 -Idrivers/net/wireless/bcm4329/include
 
 ifeq ($(CONFIG_BCM4329_WIFI_CONTROL_FUNC),y)
 DHDCFLAGS += -DCONFIG_WIFI_CONTROL_FUNC
 endif
+
+ifeq ($(CONFIG_BCM4329_FIRST_SCAN),y)
+DHDCFLAGS += -DCONFIG_FIRST_SCAN
+endif
+
 ifeq ($(CONFIG_BCM4329_DHD_USE_STATIC_BUF),y)
 DHDCFLAGS += -DDHD_USE_STATIC_BUF
 endif
@@ -23,6 +28,8 @@ DHDCFLAGS += -DGET_CUSTOM_MAC_ENABLE
 endif
 ifeq ($(CONFIG_BCM4329_HW_OOB),y)
 DHDCFLAGS += -DHW_OOB
+else
+DHDCFLAGS += -DSDIO_ISR_THREAD
 endif
 
 DHDOFILES = dhd_linux.o linux_osl.o bcmutils.o dhd_common.o dhd_custom_gpio.o \
