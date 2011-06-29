@@ -1884,13 +1884,13 @@ static __devinit int wm8903_i2c_probe(struct i2c_client *i2c,
 
 	val = snd_soc_read(codec, WM8903_ANALOGUE_OUT1_LEFT);
 	val |= WM8903_HPOUTVU;
-	snd_soc_write(codec, WM8903_ANALOGUE_OUT1_LEFT, 0xB8);
-	snd_soc_write(codec, WM8903_ANALOGUE_OUT1_RIGHT, 0xB8);
+	snd_soc_write(codec, WM8903_ANALOGUE_OUT1_LEFT, val);
+	snd_soc_write(codec, WM8903_ANALOGUE_OUT1_RIGHT, val);
 
 	val = snd_soc_read(codec, WM8903_ANALOGUE_OUT2_LEFT);
 	val |= WM8903_LINEOUTVU;
-	snd_soc_write(codec, WM8903_ANALOGUE_OUT2_LEFT, 0xB7);
-	snd_soc_write(codec, WM8903_ANALOGUE_OUT2_RIGHT, 0xB7);
+	snd_soc_write(codec, WM8903_ANALOGUE_OUT2_LEFT, val);
+	snd_soc_write(codec, WM8903_ANALOGUE_OUT2_RIGHT, val);
 
 	val = snd_soc_read(codec, WM8903_ANALOGUE_OUT3_LEFT);
 	val |= WM8903_SPKVU;

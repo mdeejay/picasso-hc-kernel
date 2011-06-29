@@ -55,6 +55,8 @@ extern struct snd_soc_platform tegra_soc_platform;
 #define R20_SIDETONE_CTRL	32
 #define R29_DRC_1		41
 #define SET_REG_VAL(r,m,l,v) (((r)&(~((m)<<(l))))|(((v)&(m))<<(l)))
+#define ICONIA_HP_VOL 60
+#define ICONIA_LINE_VOL 58
 
 static int tegra_hifi_hw_params(struct snd_pcm_substream *substream,
 					struct snd_pcm_hw_params *params)
@@ -159,10 +161,14 @@ static int tegra_hifi_hw_params(struct snd_pcm_substream *substream,
 		snd_soc_write(codec, R29_DRC_1, CtrlReg);
 	}
 
-	snd_soc_write(codec, WM8903_ANALOGUE_OUT1_LEFT, 0xB8);
-	snd_soc_write(codec, WM8903_ANALOGUE_OUT1_RIGHT, 0xB8);
-	snd_soc_write(codec, WM8903_ANALOGUE_OUT2_LEFT, 0xB7);
-	snd_soc_write(codec, WM8903_ANALOGUE_OUT2_RIGHT, 0xB7);
+       snd_soc_write(codec, WM8903_ANALOGUE_OUT1_LEFT,
+               WM8903_HPOUTVU | ICONIA_HP_VOL);
+       snd_soc_write(codec, WM8903_ANALOGUE_OUT1_RIGHT,
+               WM8903_HPOUTVU | ICONIA_HP_VOL);
+       snd_soc_write(codec, WM8903_ANALOGUE_OUT2_LEFT,
+               WM8903_LINEOUTVU | ICONIA_LINE_VOL);
+       snd_soc_write(codec, WM8903_ANALOGUE_OUT2_RIGHT,
+               WM8903_LINEOUTVU | ICONIA_LINE_VOL);
 
 	return 0;
 }
