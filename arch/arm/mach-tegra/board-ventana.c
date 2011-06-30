@@ -99,7 +99,7 @@ static struct plat_serial8250_port debug_uart_platform_data[] = {
 	}
 };
 
-static struct platform_device debug_uart = {
+struct platform_device debug_uart = {
 	.name = "serial8250",
 	.id = PLAT8250_DEV_PLATFORM,
 	.dev = {
@@ -511,17 +511,6 @@ static void ventana_i2c_init(void)
 
 
 #ifdef CONFIG_KEYBOARD_GPIO
-//ddebug #define GPIO_KEY(_id, _gpio, _iswake)		\
-//ddebug 	{					\
-//ddebug 		.code = _id,			\
-//ddebug 		.gpio = TEGRA_GPIO_##_gpio,	\
-//ddebug 		.active_low = 1,		\
-//ddebug 		.desc = #_id,			\
-//ddebug 		.type = EV_KEY,			\
-//ddebug 		.wakeup = _iswake,		\
-//ddebug 		.debounce_interval = 10,	\
-//ddebug 	}
-//ddebug - start
 #define GPIO_KEY(_id, _gpio,_isactivelow, _iswake)		\
 	{					\
 		.code = _id,			\
@@ -534,19 +523,10 @@ static void ventana_i2c_init(void)
 	}
 
 static struct gpio_keys_button ventana_keys[] = {
-//ddebug 	[0] = GPIO_KEY(KEY_FIND, PQ3, 0),
-//ddebug 	[1] = GPIO_KEY(KEY_HOME, PQ1, 0),
-//ddebug 	[2] = GPIO_KEY(KEY_BACK, PQ2, 0),
-//ddebug 	[3] = GPIO_KEY(KEY_VOLUMEUP, PQ5, 0),
-//ddebug 	[4] = GPIO_KEY(KEY_VOLUMEDOWN, PQ4, 0),
-//ddebug 	[5] = GPIO_KEY(KEY_POWER, PV2, 1),
-//ddebug 	[6] = GPIO_KEY(KEY_MENU, PC7, 0),
-//ddebug - start
         [0] = GPIO_KEY(KEY_VOLUMEUP, PQ4, 1,  0),
         [1] = GPIO_KEY(KEY_VOLUMEDOWN, PQ5, 1, 0),
         [2] = GPIO_KEY(KEY_POWER, PC7, 0, 1),
         [3] = GPIO_KEY(KEY_POWER, PI3, 0, 0),
-//ddebug - end
 };
 
 #define PMC_WAKE_STATUS 0x14
@@ -556,8 +536,7 @@ static int ventana_wakeup_key(void)
 	unsigned long status =
 		readl(IO_ADDRESS(TEGRA_PMC_BASE) + PMC_WAKE_STATUS);
 
-//ddebug 	return status & TEGRA_WAKE_GPIO_PV2 ? KEY_POWER : KEY_RESERVED;
-	return status & TEGRA_WAKE_GPIO_PC7 ? KEY_POWER : KEY_RESERVED; //ddebug
+	return status & TEGRA_WAKE_GPIO_PC7 ? KEY_POWER : KEY_RESERVED;
 }
 
 static struct gpio_keys_platform_data ventana_keys_platform_data = {
@@ -909,8 +888,6 @@ static void __init tegra_ventana_init(void)
 	tegra_i2s_device2.dev.platform_data = &tegra_audio_pdata[1];
 	tegra_spdif_device.dev.platform_data = &tegra_spdif_pdata;
 	tegra_das_device.dev.platform_data = &tegra_das_pdata;
-//ddebug 	tegra_ehci2_device.dev.platform_data
-//ddebug 		= &ventana_ehci2_ulpi_platform_data;
 	platform_add_devices(ventana_devices, ARRAY_SIZE(ventana_devices));
 
 #ifdef CONFIG_DOCK
@@ -927,13 +904,8 @@ static void __init tegra_ventana_init(void)
 	tegra_get_board_info(&BoardInfo);
 
 	/* boards with sku > 0 have atmel touch panels */
-//ddebug 	if (BoardInfo.sku) {
 		pr_info("Initializing Atmel touch driver\n");
 		ventana_touch_init_atmel();
-//ddebug 	} else {
-//ddebug 		pr_info("Initializing Panjit touch driver\n");
-//ddebug 		ventana_touch_init_panjit();
-//ddebug 	}
 #endif
 
 #ifdef CONFIG_KEYBOARD_GPIO
@@ -957,21 +929,15 @@ static void __init tegra_ventana_init(void)
 #ifdef CONFIG_ANDROID_TIMED_GPIO
         tegra_gpio_enable(TEGRA_GPIO_PV5);
 #endif
-//ddebug - start
-        // [Peter] enable gpio for headphone detection
         tegra_gpio_enable(TEGRA_GPIO_PW2);
 #ifdef CONFIG_ROTATELOCK
-        // [Peter] enable gpio for rotation lock
         tegra_gpio_enable(TEGRA_GPIO_PQ2);
 #endif
 #ifdef CONFIG_DOCK && CONFIG_ACER_DOCK_HS
         tegra_gpio_enable(TEGRA_GPIO_PX6);
 #endif
-	    // [Peter] enable gpio for simcard detection
         tegra_gpio_enable(TEGRA_GPIO_PI7);
-        // [Peter] enable gpio for p-sensor
         tegra_gpio_enable(TEGRA_GPIO_PC1);
-//ddebug - end
 }
 
 int __init tegra_ventana_protected_aperture_init(void)

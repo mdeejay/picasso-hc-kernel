@@ -27,7 +27,7 @@
 
 #include <mach/gpio.h>
 
-#include <linux/delay.h>       //ddebug
+#include <linux/delay.h>
 #ifdef CONFIG_VIDEO_OV5650
 #include <media/ov5650.h>
 #endif
@@ -64,7 +64,6 @@
 #define YUV5_RST_L_GPIO         TEGRA_GPIO_PL6
 #endif
 
-//ddebug - start
 struct camera_gpios {
 	const char *name;
 	int gpio;
@@ -79,22 +78,18 @@ struct camera_gpios {
 		.enabled = _enabled,			                        \
 		.milliseconds = _milliseconds,				        \
 	}
-//ddebug - end
 
 extern void tegra_throttling_enable(bool enable);
 
-//ddebug - start
 #ifdef CONFIG_VIDEO_OV5650
 static struct camera_gpios ov5650_gpio_keys[] = {
 	[0] = CAMERA_GPIO("cam_power_en", CAMERA_POWER_GPIO, 1, 0),
 	[1] = CAMERA_GPIO("cam_pwdn", OV5650_PWR_DN_GPIO, 0, 0),
 	[2] = CAMERA_GPIO("cam_rst_lo", OV5650_RST_L_GPIO, 1, 0),
 };
-//ddebug - end
 
 static int ventana_ov5650_power_on(void)
 {
-//ddebug - start
 	int i, ret;
 
 	for (i = 0; i < ARRAY_SIZE(ov5650_gpio_keys); i++) {
@@ -130,12 +125,10 @@ fail:
 	while (i--)
 		gpio_free(ov5650_gpio_keys[i].gpio);
 	return ret;
-//ddebug - end
 }
 
 static int ventana_ov5650_power_off(void)
 {
-//ddebug - start
         int i;
 
 	gpio_direction_output(OV5650_PWR_DN_GPIO, 1);
@@ -146,7 +139,6 @@ static int ventana_ov5650_power_off(void)
 	i = ARRAY_SIZE(ov5650_gpio_keys);
 	while (i--)
 		gpio_free(ov5650_gpio_keys[i].gpio);
-//ddebug - end
 	return 0;
 }
 
@@ -171,7 +163,6 @@ struct ov2710_platform_data ventana_ov2710_data = {
 	.power_on = ventana_ov2710_power_on,
 	.power_off = ventana_ov2710_power_off,
 };
-//ddebug - start
 #ifdef CONFIG_VIDEO_YUV
 static struct camera_gpios yuv_sensor_gpio_keys[] = {
 	[0] = CAMERA_GPIO("cam_power_en", CAMERA_POWER_GPIO, 1, 0),
@@ -236,7 +227,6 @@ struct yuv_sensor_platform_data yuv_sensor_data = {
 	.power_off = yuv_sensor_power_off,
 };
 #endif /* CONFIG_VIDEO_YUV */
-//ddebug - end
 
 #ifdef CONFIG_VIDEO_YUV5
 static struct camera_gpios yuv5_sensor_gpio_keys[] = {
@@ -307,7 +297,6 @@ static int ventana_camera_init(void)
 	int i, ret;
 
 #ifdef CONFIG_VIDEO_OV5650
-	// initialize OV5650
 	for (i = 0; i < ARRAY_SIZE(ov5650_gpio_keys); i++) {
 		tegra_gpio_enable(ov5650_gpio_keys[i].gpio);
 		ret = gpio_request(ov5650_gpio_keys[i].gpio,
@@ -330,7 +319,6 @@ static int ventana_camera_init(void)
 #endif
 
 #ifdef CONFIG_VIDEO_YUV
-	// initialize MT9D115
 	for (i = 0; i < ARRAY_SIZE(yuv_sensor_gpio_keys); i++) {
 		tegra_gpio_enable(yuv_sensor_gpio_keys[i].gpio);
 		ret = gpio_request(yuv_sensor_gpio_keys[i].gpio,
@@ -353,7 +341,6 @@ static int ventana_camera_init(void)
 #endif
 
 #ifdef CONFIG_VIDEO_YUV5
-	// initialize MT9P111
 	for (i = 0; i < ARRAY_SIZE(yuv5_sensor_gpio_keys); i++) {
 		tegra_gpio_enable(yuv5_sensor_gpio_keys[i].gpio);
 		ret = gpio_request(yuv5_sensor_gpio_keys[i].gpio,
@@ -415,20 +402,12 @@ static void ventana_akm8975_init(void)
 }
 #endif
 
-//ddebug static void ventana_bq20z75_init(void)
-//ddebug {
-//ddebug 	tegra_gpio_enable(AC_PRESENT_GPIO);
-//ddebug 	gpio_request(AC_PRESENT_GPIO, "ac_present");
-//ddebug 	gpio_direction_input(AC_PRESENT_GPIO);
-//ddebug }
-//ddebug - start
 static void ventana_ECBat_init(void)
 {
 	tegra_gpio_enable(AC_PRESENT_GPIO);
 	gpio_request(AC_PRESENT_GPIO, "ac_present");
 	gpio_direction_input(AC_PRESENT_GPIO);
 }
-//ddebug - end
 
 static void ventana_nct1008_init(void)
 {
@@ -458,41 +437,10 @@ static const struct i2c_board_info ventana_i2c0_board_info[] = {
 
 static const struct i2c_board_info ventana_i2c2_board_info[] = {
 	{
-//ddebug 		I2C_BOARD_INFO("bq20z75-battery", 0x0B),
-//ddebug 		.irq = TEGRA_GPIO_TO_IRQ(AC_PRESENT_GPIO),
-		I2C_BOARD_INFO("EC_Battery", 0x58),        //ddebug
-		.irq = TEGRA_GPIO_TO_IRQ(AC_PRESENT_GPIO), //ddebug
+		I2C_BOARD_INFO("EC_Battery", 0x58),
+		.irq = TEGRA_GPIO_TO_IRQ(AC_PRESENT_GPIO),
 	},
 };
-
-//ddebug static struct pca953x_platform_data ventana_tca6416_data = {
-//ddebug 	.gpio_base      = TEGRA_NR_GPIOS + 4, /* 4 gpios are already requested by tps6586x */
-//ddebug };
-
-//ddebug static struct pca954x_platform_mode ventana_pca9546_modes[] = {
-//ddebug 	{ .adap_id = 6, }, /* REAR CAM1 */
-//ddebug 	{ .adap_id = 7, }, /* REAR CAM2 */
-//ddebug 	{ .adap_id = 8, }, /* FRONT CAM3 */
-//ddebug };
-
-//ddebug static struct pca954x_platform_data ventana_pca9546_data = {
-//ddebug 	.modes	  = ventana_pca9546_modes,
-//ddebug 	.num_modes      = ARRAY_SIZE(ventana_pca9546_modes),
-//ddebug };
-
-//ddebug static const struct i2c_board_info ventana_i2c3_board_info_tca6416[] = {
-//ddebug 	{
-//ddebug 		I2C_BOARD_INFO("tca6416", 0x20),
-//ddebug 		.platform_data = &ventana_tca6416_data,
-//ddebug 	},
-//ddebug };
-
-//ddebug static const struct i2c_board_info ventana_i2c3_board_info_pca9546[] = {
-//ddebug 	{
-//ddebug 		I2C_BOARD_INFO("pca9546", 0x70),
-//ddebug 		.platform_data = &ventana_pca9546_data,
-//ddebug 	},
-//ddebug };
 
 static struct i2c_board_info ventana_i2c4_board_info[] = {
 	{
@@ -509,15 +457,14 @@ static struct i2c_board_info ventana_i2c4_board_info[] = {
 #endif
 };
 
-//ddebug static struct i2c_board_info ventana_i2c7_board_info[] = {
-static struct i2c_board_info ventana_i2c3_board_info[] = {  //ddebug
+static struct i2c_board_info ventana_i2c3_board_info[] = {
 #ifdef CONFIG_VIDEO_OV5650
 	{
 		I2C_BOARD_INFO("ov5650", 0x36),
 		.platform_data = &ventana_ov5650_data,
 	},
 #endif /*CONFIG_VIDEO_OV5650*/
-//ddebug - start
+
 #ifdef CONFIG_VIDEO_YUV
 	{
 		I2C_BOARD_INFO("mt9d115", 0x3C),
@@ -540,16 +487,8 @@ static struct i2c_board_info ventana_i2c3_board_info[] = {  //ddebug
 		I2C_BOARD_INFO("ltc3216", 0x33),
 	},
 #endif /*CONFIG_VIDEO_LTC3216*/
-//ddebug - end
 
 };
-
-//ddebug static struct i2c_board_info ventana_i2c8_board_info[] = {
-//ddebug 	{
-//ddebug 		I2C_BOARD_INFO("ov2710", 0x36),
-//ddebug 		.platform_data = &ventana_ov2710_data,
-//ddebug 	},
-//ddebug };
 
 #ifdef CONFIG_MPU_SENSORS_MPU3050
 #define SENSOR_MPU_NAME "mpu3050"
@@ -674,26 +613,15 @@ int __init ventana_sensors_init(void)
 	 * battery driver is supported on FAB.D boards and above only,
 	 * since they have the necessary hardware rework
 	 */
-//ddebug 	if (BoardInfo.sku > 0) {
-//ddebug 		ventana_bq20z75_init();
 	        ventana_ECBat_init();
 		i2c_register_board_info(2, ventana_i2c2_board_info,
 			ARRAY_SIZE(ventana_i2c2_board_info));
-//ddebug 	}
 
-//ddebug - start
 	i2c_register_board_info(3, ventana_i2c3_board_info,
 		ARRAY_SIZE(ventana_i2c3_board_info));
-//ddebug -end
 
 	i2c_register_board_info(4, ventana_i2c4_board_info,
 		ARRAY_SIZE(ventana_i2c4_board_info));
-
-//ddebug 	i2c_register_board_info(7, ventana_i2c7_board_info,
-//ddebug 		ARRAY_SIZE(ventana_i2c7_board_info));
-
-//ddebug 	i2c_register_board_info(8, ventana_i2c8_board_info,
-//ddebug 		ARRAY_SIZE(ventana_i2c8_board_info));
 
 
 #ifdef CONFIG_MPU_SENSORS_MPU3050
@@ -705,63 +633,5 @@ int __init ventana_sensors_init(void)
 }
 
 #ifdef CONFIG_VIDEO_OV5650
-//ddebug - start
-//ddebug struct camera_gpios {
-//ddebug 	const char *name;
-//ddebug 	int gpio;
-//ddebug 	int enabled;
-//ddebug };
-//ddebug 
-//ddebug #define CAMERA_GPIO(_name, _gpio, _enabled)		\
-//ddebug 	{						\
-//ddebug 		.name = _name,				\
-//ddebug 		.gpio = _gpio,				\
-//ddebug 		.enabled = _enabled,			\
-//ddebug 	}
-//ddebug 
-//ddebug 
-//ddebug static struct camera_gpios ov5650_gpio_keys[] = {
-//ddebug 	[0] = OV5650_GPIO("en_avdd_csi", AVDD_DSI_CSI_ENB_GPIO, 1),
-//ddebug 	[1] = OV5650_GPIO("cam2_pwdn", CAM2_PWR_DN_GPIO, 0),
-//ddebug 	[2] = OV5650_GPIO("cam2_rst_lo", CAM2_RST_L_GPIO, 1),
-//ddebug 	[3] = OV5650_GPIO("cam2_af_pwdn_lo", CAM2_AF_PWR_DN_L_GPIO, 0),
-//ddebug 	[4] = OV5650_GPIO("cam2_ldo_shdn_lo", CAM2_LDO_SHUTDN_L_GPIO, 1),
-//ddebug 	[5] = OV5650_GPIO("cam2_i2c_mux_rst_lo", CAM2_I2C_MUX_RST_GPIO, 1),
-//ddebug };
-//ddebug 
-//ddebug int __init ventana_ov5650_late_init(void)
-//ddebug {
-//ddebug 	int ret;
-//ddebug 	int i;
-//ddebug 
-//ddebug 	if (!machine_is_ventana())
-//ddebug 		return 0;
-//ddebug 
-//ddebug 	i2c_new_device(i2c_get_adapter(3), ventana_i2c3_board_info_tca6416);
-//ddebug 
-//ddebug 	for (i = 0; i < ARRAY_SIZE(ov5650_gpio_keys); i++) {
-//ddebug 		ret = gpio_request(ov5650_gpio_keys[i].gpio,
-//ddebug 			ov5650_gpio_keys[i].name);
-//ddebug 		if (ret < 0) {
-//ddebug 			pr_err("%s: gpio_request failed for gpio #%d\n",
-//ddebug 				__func__, i);
-//ddebug 			goto fail;
-//ddebug 		}
-//ddebug 		gpio_direction_output(ov5650_gpio_keys[i].gpio,
-//ddebug 			ov5650_gpio_keys[i].enabled);
-//ddebug 		gpio_export(ov5650_gpio_keys[i].gpio, false);
-//ddebug 	}
-//ddebug 
-//ddebug 	i2c_new_device(i2c_get_adapter(3), ventana_i2c3_board_info_pca9546);
-//ddebug 
-//ddebug 	return 0;
-//ddebug 
-//ddebug fail:
-//ddebug 	while (i--)
-//ddebug 		gpio_free(ov5650_gpio_keys[i].gpio);
-//ddebug 	return ret;
-//ddebug }
-//ddebug 
-//ddebug late_initcall(ventana_ov5650_late_init);
 
 #endif /* CONFIG_VIDEO_OV5650 */

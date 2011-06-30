@@ -194,10 +194,8 @@ static struct tegra_dc_mode ventana_panel_modes[] = {
 		.v_sync_width = 4,
 		.h_back_porch = 58,
 		.v_back_porch = 4,
-//ddebug 		.h_active = 1366,
-//ddebug 		.v_active = 768,
-		.h_active = 1280, //ddebug
-		.v_active = 800,  //ddebug
+		.h_active = 1280,
+		.v_active = 800,
 		.h_front_porch = 58,
 		.v_front_porch = 4,
 	},
@@ -205,19 +203,15 @@ static struct tegra_dc_mode ventana_panel_modes[] = {
 
 static struct tegra_fb_data ventana_fb_data = {
 	.win		= 0,
-//ddebug 	.xres		= 1366,
-//ddebug 	.yres		= 768,
-	.xres		= 1280, //ddebug
-	.yres		= 800,  //ddebug
+	.xres		= 1280,
+	.yres		= 800,
 	.bits_per_pixel	= 32,
 };
 
 static struct tegra_fb_data ventana_hdmi_fb_data = {
 	.win		= 0,
-//ddebug 	.xres		= 1366,
-//ddebug 	.yres		= 768,
-	.xres		= 1280, //ddebug
-	.yres		= 800,  //ddebug
+	.xres		= 1920,
+	.yres		= 1080,
 	.bits_per_pixel	= 32,
 };
 
@@ -349,10 +343,6 @@ int __init ventana_panel_init(void)
 	gpio_request(ventana_lvds_shutdown, "lvds_shdn");
 	gpio_direction_output(ventana_lvds_shutdown, 1);
 	tegra_gpio_enable(ventana_lvds_shutdown);
-
-//ddebug 	tegra_gpio_enable(ventana_hdmi_enb);
-//ddebug 	gpio_request(ventana_hdmi_enb, "hdmi_5v_en");
-//ddebug 	gpio_direction_output(ventana_hdmi_enb, 1);
 
 	tegra_gpio_enable(ventana_hdmi_hpd);
 	gpio_request(ventana_hdmi_hpd, "hdmi_hpd");
