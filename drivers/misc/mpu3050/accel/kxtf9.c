@@ -329,6 +329,7 @@ static int kxtf9_suspend(void *mlsl_handle,
 	unsigned char data;
 	struct kxtf9_private_data *private_data = pdata->private_data;
 
+	printk("%s+\n", __func__);
 	/* Wake up */
 	result = MLSLSerialWriteSingle(mlsl_handle, pdata->address,
 				KXTF9_CTRL_REG1, 0x40);
@@ -361,6 +362,7 @@ static int kxtf9_suspend(void *mlsl_handle,
 	result = MLSLSerialRead(mlsl_handle, pdata->address,
 				KXTF9_INT_REL, 1, &data);
 	ERROR_CHECK(result);
+	printk("%s-\n", __func__);
 
 	return result;
 }
@@ -377,6 +379,7 @@ static int kxtf9_resume(void *mlsl_handle,
 	unsigned char data;
 	struct kxtf9_private_data *private_data = pdata->private_data;
 
+	printk("%s+\n", __func__);
 	/* Wake up */
 	result = MLSLSerialWriteSingle(mlsl_handle, pdata->address,
 				KXTF9_CTRL_REG1, 0x40);
@@ -408,7 +411,7 @@ static int kxtf9_resume(void *mlsl_handle,
 	result = MLSLSerialRead(mlsl_handle, pdata->address,
 				KXTF9_INT_REL, 1, &data);
 	ERROR_CHECK(result);
-
+	printk("%s-\n", __func__);
 	return ML_SUCCESS;
 }
 
@@ -453,7 +456,7 @@ static int kxtf9_init(void *mlsl_handle,
 	ERROR_CHECK(result);
 
 	result = kxtf9_set_odr(mlsl_handle, pdata, &private_data->suspend,
-			FALSE, 0);
+			FALSE, 50000);
 	ERROR_CHECK(result);
 	result = kxtf9_set_odr(mlsl_handle, pdata, &private_data->resume,
 			FALSE, 200000);
