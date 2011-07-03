@@ -22,22 +22,22 @@
 #include "tegra_soc.h"
 
 #include <mach/audio.h>
-#include "../codecs/wm8903.h" //ddebug
+#include "../codecs/wm8903.h" 
 
 #define TEGRA_HP	0
 #define TEGRA_MIC	1
 #define TEGRA_LINE	2
 #define TEGRA_HEADSET	3
 #define TEGRA_HP_OFF	4
-#define TEGRA_SPK_ON	1 //ddebug
-#define TEGRA_SPK_OFF	0 //ddebug
+#define TEGRA_SPK_ON	1
+#define TEGRA_SPK_OFF	0
 
 static struct tegra_audio_data *audio_data;
 static int tegra_jack_func;
 static int tegra_spk_func;
 
 #ifdef TEGRA_DDBUG
-//ddebug - start
+
 static int amp_event(struct snd_soc_dapm_widget *widget, struct snd_kcontrol *kctl, int event)
 {
 /*
@@ -60,7 +60,7 @@ static int amp_event(struct snd_soc_dapm_widget *widget, struct snd_kcontrol *kc
 
 	return 0;
 }
-//ddebug - end
+
 #endif
 
 static void tegra_ext_control(struct snd_soc_codec *codec)
@@ -149,7 +149,7 @@ static const struct snd_soc_dapm_widget tegra_dapm_widgets[] = {
 	SND_SOC_DAPM_HP("Headphone Jack", NULL),
 	SND_SOC_DAPM_MIC("Mic Jack", NULL),
 #ifdef TEGRA_DDBUG
-	SND_SOC_DAPM_SPK("Ext Spk", amp_event), //ddebug
+	SND_SOC_DAPM_SPK("Ext Spk", amp_event),
 #else
 	SND_SOC_DAPM_SPK("Ext Spk", NULL),
 #endif
