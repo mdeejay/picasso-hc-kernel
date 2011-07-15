@@ -84,6 +84,22 @@ const struct fb_videomode tegra_dc_hdmi_supported_modes[] = {
 		.sync = FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 	},
 
+	/* 1280x720p 60hz: EIA/CEA-861-B Format 4 (Stereo)*/
+	{
+		.xres =		1280,
+		.yres =		720,
+		.pixclock =	KHZ2PICOS(74250),
+		.hsync_len =	40,	/* h_sync_width */
+		.vsync_len =	5,	/* v_sync_width */
+		.left_margin =	220,	/* h_back_porch */
+		.upper_margin =	20,	/* v_back_porch */
+		.right_margin =	110,	/* h_front_porch */
+		.lower_margin =	5,	/* v_front_porch */
+		.vmode = FB_VMODE_NONINTERLACED |
+				 FB_VMODE_STEREO_FRAME_PACK,
+		.sync = FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	},
+
 	/* 720x480p 59.94hz: EIA/CEA-861-B Formats 2 & 3 */
 	{
 		.xres =		720,
@@ -128,7 +144,20 @@ const struct fb_videomode tegra_dc_hdmi_supported_modes[] = {
 		.vmode =	FB_VMODE_NONINTERLACED,
 		.sync = 0,
 	},
-
+	/* 1920x1080p 30Hz EIA/CEA-861-B Format 34 */
+	{
+		.xres =		1920,
+		.yres =		1080,
+		.pixclock =	KHZ2PICOS(74250),
+		.hsync_len =	44,	/* h_sync_width */
+		.vsync_len =	5,	/* v_sync_width */
+		.left_margin =	148,	/* h_back_porch */
+		.upper_margin =	36,	/* v_back_porch */
+		.right_margin =	88,	/* h_front_porch */
+		.lower_margin =	4,	/* v_front_porch */
+		.vmode =	FB_VMODE_NONINTERLACED,
+		.sync = FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	},
 	/* 1920x1080p 59.94/60hz EIA/CEA-861-B Format 16 */
 	{
 		.xres =		1920,
@@ -144,6 +173,62 @@ const struct fb_videomode tegra_dc_hdmi_supported_modes[] = {
 		.sync = FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 	},
 };
+
+/* table of electrical settings, must be in acending order. */
+struct tdms_config {
+	int pclk;
+	u32 pll0;
+	u32 pll1;
+	u32 pe_current; /* pre-emphasis */
+	u32 drive_current;
+};
+
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+const struct tdms_config tdms_config[] = {
+	{ /* 480p modes */
+	.pclk = 27000000,
+	.pll0 = SOR_PLL_BG_V17_S(3) | SOR_PLL_ICHPMP(1) | SOR_PLL_RESISTORSEL |
+		SOR_PLL_VCOCAP(0) | SOR_PLL_TX_REG_LOAD(3),
+	.pll1 = SOR_PLL_TMDS_TERM_ENABLE,
+	.pe_current = PE_CURRENT0(PE_CURRENT_0_0_mA) |
+		PE_CURRENT1(PE_CURRENT_0_0_mA) |
+		PE_CURRENT2(PE_CURRENT_0_0_mA) |
+		PE_CURRENT3(PE_CURRENT_0_0_mA),
+	.drive_current = DRIVE_CURRENT_LANE0(DRIVE_CURRENT_7_125_mA) |
+		DRIVE_CURRENT_LANE1(DRIVE_CURRENT_7_125_mA) |
+		DRIVE_CURRENT_LANE2(DRIVE_CURRENT_7_125_mA) |
+		DRIVE_CURRENT_LANE3(DRIVE_CURRENT_7_125_mA),
+	},
+	{ /* 720p modes */
+	.pclk = 74250000,
+	.pll0 = SOR_PLL_BG_V17_S(3) | SOR_PLL_ICHPMP(1) | SOR_PLL_RESISTORSEL |
+		SOR_PLL_VCOCAP(1) | SOR_PLL_TX_REG_LOAD(3),
+	.pll1 = SOR_PLL_TMDS_TERM_ENABLE | SOR_PLL_PE_EN,
+	.pe_current = PE_CURRENT0(PE_CURRENT_6_0_mA) |
+		PE_CURRENT1(PE_CURRENT_6_0_mA) |
+		PE_CURRENT2(PE_CURRENT_6_0_mA) |
+		PE_CURRENT3(PE_CURRENT_6_0_mA),
+	.drive_current = DRIVE_CURRENT_LANE0(DRIVE_CURRENT_7_125_mA) |
+		DRIVE_CURRENT_LANE1(DRIVE_CURRENT_7_125_mA) |
+		DRIVE_CURRENT_LANE2(DRIVE_CURRENT_7_125_mA) |
+		DRIVE_CURRENT_LANE3(DRIVE_CURRENT_7_125_mA),
+	},
+	{ /* 1080p modes */
+	.pclk = INT_MAX,
+	.pll0 = SOR_PLL_BG_V17_S(3) | SOR_PLL_ICHPMP(1) | SOR_PLL_RESISTORSEL |
+		SOR_PLL_VCOCAP(1) | SOR_PLL_TX_REG_LOAD(3),
+	.pll1 = SOR_PLL_TMDS_TERM_ENABLE | SOR_PLL_PE_EN,
+	.pe_current = PE_CURRENT0(PE_CURRENT_6_0_mA) |
+		PE_CURRENT1(PE_CURRENT_6_0_mA) |
+		PE_CURRENT2(PE_CURRENT_6_0_mA) |
+		PE_CURRENT3(PE_CURRENT_6_0_mA),
+	.drive_current = DRIVE_CURRENT_LANE0(DRIVE_CURRENT_7_125_mA) |
+		DRIVE_CURRENT_LANE1(DRIVE_CURRENT_7_125_mA) |
+		DRIVE_CURRENT_LANE2(DRIVE_CURRENT_7_125_mA) |
+		DRIVE_CURRENT_LANE3(DRIVE_CURRENT_7_125_mA),
+	},
+};
+#endif
 
 struct tegra_hdmi_audio_config {
 	unsigned pix_clock;
@@ -399,27 +484,52 @@ static void hdmi_dumpregs(struct tegra_dc_hdmi_data *hdmi)
 
 #define PIXCLOCK_TOLERANCE	200
 
+static int tegra_dc_calc_clock_per_frame(const struct fb_videomode *mode)
+{
+	return (mode->left_margin + mode->xres +
+		mode->right_margin + mode->hsync_len) *
+	       (mode->upper_margin + mode->yres +
+		mode->lower_margin + mode->vsync_len);
+}
 static bool tegra_dc_hdmi_mode_equal(const struct fb_videomode *mode1,
 					const struct fb_videomode *mode2)
 {
+	int clock_per_frame = tegra_dc_calc_clock_per_frame(mode1);
+
+	/* allows up to 1Hz of pixclock difference */
 	return mode1->xres	== mode2->xres &&
 		mode1->yres	== mode2->yres &&
+		(abs(PICOS2KHZ(mode1->pixclock - mode2->pixclock)) *
+		1000 / clock_per_frame <= 1) &&
 		mode1->vmode	== mode2->vmode;
 }
 
-static bool tegra_dc_hdmi_mode_filter(struct fb_videomode *mode)
+static bool tegra_dc_hdmi_valid_pixclock(const struct tegra_dc *dc,
+					const struct fb_videomode *mode)
+{
+	unsigned max_pixclock = tegra_dc_get_out_max_pixclock(dc);
+	if (max_pixclock) {
+		// this might look counter-intuitive, but pixclock's unit is picos(not Khz)
+		return mode->pixclock >= max_pixclock;
+	} else {
+		return true;
+	}
+}
+
+static bool tegra_dc_hdmi_mode_filter(const struct tegra_dc *dc,
+					struct fb_videomode *mode)
 {
 	int i;
-	int clocks;
+	int clock_per_frame;
 
 	for (i = 0; i < ARRAY_SIZE(tegra_dc_hdmi_supported_modes); i++) {
-		if (tegra_dc_hdmi_mode_equal(&tegra_dc_hdmi_supported_modes[i],
-					     mode)) {
+		if (tegra_dc_hdmi_mode_equal(&tegra_dc_hdmi_supported_modes[i], mode) &&
+			tegra_dc_hdmi_valid_pixclock(dc, &tegra_dc_hdmi_supported_modes[i])) {
 			memcpy(mode, &tegra_dc_hdmi_supported_modes[i], sizeof(*mode));
 			mode->flag = FB_MODE_IS_DETAILED;
-			clocks = (mode->left_margin + mode->xres + mode->right_margin + mode->hsync_len) *
-				(mode->upper_margin + mode->yres + mode->lower_margin + mode->vsync_len);
-			mode->refresh = (PICOS2KHZ(mode->pixclock) * 1000) / clocks;
+			clock_per_frame = tegra_dc_calc_clock_per_frame(mode);
+			mode->refresh = (PICOS2KHZ(mode->pixclock) * 1000)
+					/ clock_per_frame;
 			return true;
 		}
 	}
@@ -466,6 +576,7 @@ static bool tegra_dc_hdmi_detect(struct tegra_dc *dc)
 	hdmi->dvi = !(specs.misc & FB_MISC_HDMI);
 
 	tegra_fb_update_monspecs(dc->fb, &specs, tegra_dc_hdmi_mode_filter);
+	hdmi->hpd_switch.state = 0;
 	switch_set_state(&hdmi->hpd_switch, 1);
 	dev_info(&dc->ndev->dev, "display detected\n");
 	return true;
@@ -540,6 +651,7 @@ static void tegra_dc_hdmi_resume(struct tegra_dc *dc)
 		hdmi->hpd_pending = false;
 	}
 	spin_unlock_irqrestore(&hdmi->suspend_lock, flags);
+	tegra_nvhdcp_resume(hdmi->nvhdcp);
 }
 
 static int tegra_dc_hdmi_init(struct tegra_dc *dc)
@@ -608,7 +720,6 @@ static int tegra_dc_hdmi_init(struct tegra_dc *dc)
 		err = -EBUSY;
 		goto err_put_clock;
 	}
-	enable_irq_wake(gpio_to_irq(dc->out->hotplug_gpio));
 
 	hdmi->edid = tegra_edid_create(dc->out->dcc_bus);
 	if (IS_ERR_OR_NULL(hdmi->edid)) {
@@ -657,7 +768,6 @@ static int tegra_dc_hdmi_init(struct tegra_dc *dc)
 err_edid_destroy:
 	tegra_edid_destroy(hdmi->edid);
 err_free_irq:
-	disable_irq_wake(gpio_to_irq(dc->out->hotplug_gpio));
 	free_irq(gpio_to_irq(dc->out->hotplug_gpio), dc);
 err_put_clock:
 	if (!IS_ERR_OR_NULL(disp2_clk))
@@ -679,7 +789,6 @@ static void tegra_dc_hdmi_destroy(struct tegra_dc *dc)
 {
 	struct tegra_dc_hdmi_data *hdmi = tegra_dc_get_outdata(dc);
 
-	disable_irq_wake(gpio_to_irq(dc->out->hotplug_gpio));
 	free_irq(gpio_to_irq(dc->out->hotplug_gpio), dc);
 	cancel_delayed_work_sync(&hdmi->work);
 	switch_dev_unregister(&hdmi->hpd_switch);
@@ -855,7 +964,9 @@ static void tegra_dc_hdmi_setup_avi_infoframe(struct tegra_dc *dc, bool dvi)
 			avi.m = HDMI_AVI_M_16_9;
 			avi.vic = 17;
 		}
-	} else if (dc->mode.v_active == 720) {
+	} else if (dc->mode.v_active == 720 ||
+		(dc->mode.v_active == 1470 && dc->mode.stereo_mode)) {
+		/* VIC for both 720p and 720p 3D mode */
 		avi.m = HDMI_AVI_M_16_9;
 		if (dc->mode.h_front_porch == 110)
 			avi.vic = 4; /* 60 Hz */
@@ -884,6 +995,38 @@ static void tegra_dc_hdmi_setup_avi_infoframe(struct tegra_dc *dc, bool dvi)
 			  HDMI_NV_PDISP_HDMI_AVI_INFOFRAME_CTRL);
 }
 
+static void tegra_dc_hdmi_setup_stereo_infoframe(struct tegra_dc *dc)
+{
+	struct tegra_dc_hdmi_data *hdmi = tegra_dc_get_outdata(dc);
+	struct hdmi_stereo_infoframe stereo;
+	u32 val;
+
+	if (!dc->mode.stereo_mode) {
+		val  = tegra_hdmi_readl(hdmi, HDMI_NV_PDISP_HDMI_GENERIC_CTRL);
+		val &= ~GENERIC_CTRL_ENABLE;
+		tegra_hdmi_writel(hdmi, val, HDMI_NV_PDISP_HDMI_GENERIC_CTRL);
+		return;
+	}
+
+	memset(&stereo, 0x0, sizeof(stereo));
+
+	stereo.regid0 = 0x03;
+	stereo.regid1 = 0x0c;
+	stereo.regid2 = 0x00;
+	stereo.hdmi_video_format = 2; /* 3D_Structure present */
+	stereo._3d_structure = 0; /* frame packing */
+
+	tegra_dc_hdmi_write_infopack(dc, HDMI_NV_PDISP_HDMI_GENERIC_HEADER,
+					HDMI_INFOFRAME_TYPE_VENDOR,
+					HDMI_VENDOR_VERSION,
+					&stereo, 6);
+
+	val  = tegra_hdmi_readl(hdmi, HDMI_NV_PDISP_HDMI_GENERIC_CTRL);
+	val |= GENERIC_CTRL_ENABLE;
+
+	tegra_hdmi_writel(hdmi, val, HDMI_NV_PDISP_HDMI_GENERIC_CTRL);
+}
+
 static void tegra_dc_hdmi_setup_audio_infoframe(struct tegra_dc *dc, bool dvi)
 {
 	struct tegra_dc_hdmi_data *hdmi = tegra_dc_get_outdata(dc);
@@ -907,18 +1050,29 @@ static void tegra_dc_hdmi_setup_audio_infoframe(struct tegra_dc *dc, bool dvi)
 			  HDMI_NV_PDISP_HDMI_AUDIO_INFOFRAME_CTRL);
 }
 
+static void tegra_dc_hdmi_setup_tdms(struct tegra_dc_hdmi_data *hdmi,
+		const struct tdms_config *tc)
+{
+	tegra_hdmi_writel(hdmi, tc->pll0, HDMI_NV_PDISP_SOR_PLL0);
+	tegra_hdmi_writel(hdmi, tc->pll1, HDMI_NV_PDISP_SOR_PLL1);
+
+	tegra_hdmi_writel(hdmi, tc->pe_current, HDMI_NV_PDISP_PE_CURRENT);
+
+	tegra_hdmi_writel(hdmi,
+			  tc->drive_current | DRIVE_CURRENT_FUSE_OVERRIDE,
+			  HDMI_NV_PDISP_SOR_LANE_DRIVE_CURRENT);
+}
+
 static void tegra_dc_hdmi_enable(struct tegra_dc *dc)
 {
 	struct tegra_dc_hdmi_data *hdmi = tegra_dc_get_outdata(dc);
 	int pulse_start;
 	int dispclk_div_8_2;
-	int pll0;
-	int pll1;
-	int ds;
 	int retries;
 	int rekey;
 	int err;
 	unsigned long val;
+	unsigned i;
 
 	/* enbale power, clocks, resets, etc. */
 
@@ -1004,58 +1158,17 @@ static void tegra_dc_hdmi_enable(struct tegra_dc *dc)
 		tegra_hdmi_writel(hdmi, GENERIC_CTRL_AUDIO,
 				  HDMI_NV_PDISP_HDMI_GENERIC_CTRL);
 
-
 	tegra_dc_hdmi_setup_avi_infoframe(dc, hdmi->dvi);
 	tegra_dc_hdmi_setup_audio_infoframe(dc, hdmi->dvi);
+	tegra_dc_hdmi_setup_stereo_infoframe(dc);
 
 	/* TMDS CONFIG */
-	pll0 = 0x200033f;
-	pll1 = 0;
-
-	pll0 &= ~SOR_PLL_PWR & ~SOR_PLL_VCOPD & ~SOR_PLL_PDBG & ~SOR_PLL_PDPORT & ~SOR_PLL_PULLDOWN &
-		~SOR_PLL_VCOCAP(~0) & ~SOR_PLL_ICHPMP(~0);
-	pll0 |= SOR_PLL_RESISTORSEL;
-
-	if (dc->mode.pclk <= 27000000)
-		pll0 |= SOR_PLL_VCOCAP(0);
-	else if (dc->mode.pclk <= 74250000)
-		pll0 |= SOR_PLL_VCOCAP(1);
-	else
-		pll0 |= SOR_PLL_VCOCAP(3);
-
-	if (dc->mode.h_active == 1080) {
-		pll0 |= SOR_PLL_ICHPMP(1) | SOR_PLL_TX_REG_LOAD(3) |
-			SOR_PLL_TX_REG_LOAD(3) | SOR_PLL_BG_V17_S(3);
-		pll1 |= SOR_PLL_TMDS_TERM_ENABLE | SOR_PLL_PE_EN;
-	} else {
-		pll0 |= SOR_PLL_ICHPMP(2);
+	for (i = 0; i < ARRAY_SIZE(tdms_config); i++) {
+		if (dc->mode.pclk <= tdms_config[i].pclk) {
+			tegra_dc_hdmi_setup_tdms(hdmi, &tdms_config[i]);
+			break;
+		}
 	}
-
-	tegra_hdmi_writel(hdmi, pll0, HDMI_NV_PDISP_SOR_PLL0);
-	tegra_hdmi_writel(hdmi, pll1, HDMI_NV_PDISP_SOR_PLL1);
-
-	if (pll1 & SOR_PLL_PE_EN) {
-		tegra_hdmi_writel(hdmi,
-				  PE_CURRENT0(0xf) |
-				  PE_CURRENT1(0xf) |
-				  PE_CURRENT2(0xf) |
-				  PE_CURRENT3(0xf),
-				  HDMI_NV_PDISP_PE_CURRENT);
-	}
-
-	/* enable SOR */
-	if (dc->mode.h_active == 1080)
-		ds = DRIVE_CURRENT_13_500_mA;
-	else
-		ds = DRIVE_CURRENT_5_250_mA;
-
-	tegra_hdmi_writel(hdmi,
-			  DRIVE_CURRENT_LANE0(ds) |
-			  DRIVE_CURRENT_LANE1(ds) |
-			  DRIVE_CURRENT_LANE2(ds) |
-			  DRIVE_CURRENT_LANE3(ds) |
-			  DRIVE_CURRENT_FUSE_OVERRIDE,
-			  HDMI_NV_PDISP_SOR_LANE_DRIVE_CURRENT);
 
 	tegra_hdmi_writel(hdmi,
 			  SOR_SEQ_CTL_PU_PC(0) |

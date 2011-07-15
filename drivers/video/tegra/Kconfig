@@ -9,12 +9,6 @@ config TEGRA_GRHOST
 	help
 	  Driver for the Tegra graphics host hardware.
 
-config ACER_PICASSO_SUPPORT_1080P
-	tristate "ACER HDMI 1080p out"
-	default y
-	help
-	  Display 1080p on HDMI
-
 config TEGRA_DC
 	tristate "Tegra Display Contoller"
 	depends on ARCH_TEGRA
@@ -103,5 +97,10 @@ config NVMAP_SEARCH_GLOBAL_HANDLES
 	  compatibility with legacy applications.
 	  If unsure, say N.
 
+config TEGRA_DSI
+	bool "Enable DSI panel."
+	default n
+	help
+	  Say Y here to enable the DSI panel.
 endif
 

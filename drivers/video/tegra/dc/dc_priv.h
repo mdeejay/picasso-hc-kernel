@@ -64,6 +64,7 @@ struct tegra_dc {
 	struct clk			*emc_clk;
 
 	bool				enabled;
+	bool				suspended;
 
 	struct tegra_dc_out		*out;
 	struct tegra_dc_out_ops		*out_ops;
@@ -144,5 +145,6 @@ void tegra_dc_setup_clk(struct tegra_dc *dc, struct clk *clk);
 
 extern struct tegra_dc_out_ops tegra_dc_rgb_ops;
 extern struct tegra_dc_out_ops tegra_dc_hdmi_ops;
+extern struct tegra_dc_out_ops tegra_dc_dsi_ops;
 
 #endif

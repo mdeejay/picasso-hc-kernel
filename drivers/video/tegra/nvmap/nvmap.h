@@ -89,7 +89,7 @@ struct nvmap_share {
 	wait_queue_head_t pin_wait;
 	struct mutex pin_lock;
 #ifdef CONFIG_NVMAP_RECLAIM_UNPINNED_VM
-	struct mutex mru_lock;
+	spinlock_t mru_lock;
 	struct list_head *mru_lists;
 	int nr_mru;
 #endif

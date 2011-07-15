@@ -37,36 +37,19 @@
 #include <mach/fb.h>
 #include <mach/mc.h>
 #include <mach/nvhost.h>
-#ifdef CONFIG_VENTANA_BOARD_TF101
-#include <mach/board-ventana-misc.h>
-#endif
 
 #include "dc_reg.h"
 #include "dc_priv.h"
 #include "overlay.h"
 
-#include <linux/gpio.h>
-
-/* LVDS_SHTDN_N, GPIO_PB2*/
-#define ventana_lvds_shutdown	10
-/* EN_VDD_PNL, GPIO_PC6 */
-#define ventana_pnl_pwr_enb	22
-/* LCD_BL_EN, GPIO_PD4 */
-#define ventana_bl_enb		28
-
 static int no_vsync;
-static struct timeval t_suspend;
-bool b_dc0_enabled;
-#ifdef CONFIG_VENTANA_BOARD_TF101
-extern int battery_charger_callback(unsigned int enable);
-extern  int mxt_enable(void);
-extern  int mxt_disable(void);
-#endif
+
 module_param_named(no_vsync, no_vsync, int, S_IRUGO | S_IWUSR);
 
 struct tegra_dc *tegra_dcs[TEGRA_MAX_DC];
 
 DEFINE_MUTEX(tegra_dc_lock);
+DEFINE_MUTEX(shared_lock);
 
 static inline int tegra_dc_fmt_bpp(int fmt)
 {
@@ -742,8 +725,145 @@ void tegra_dc_setup_clk(struct tegra_dc *dc, struct clk *clk)
 			clk_set_parent(clk, pll_d_out0_clk);
 	}
 
+	if (dc->out->type == TEGRA_DC_OUT_DSI) {
+		unsigned long rate;
+		struct clk *pll_d_out0_clk =
+			clk_get_sys(NULL, "pll_d_out0");
+		struct clk *pll_d_clk =
+			clk_get_sys(NULL, "pll_d");
+
+		rate = dc->mode.pclk;
+		if (rate != clk_get_rate(pll_d_clk))
+			clk_set_rate(pll_d_clk, rate);
+
+		if (clk_get_parent(clk) != pll_d_out0_clk)
+			clk_set_parent(clk, pll_d_out0_clk);
+	}
+
 	pclk = tegra_dc_pclk_round_rate(dc, dc->mode.pclk);
 	tegra_dvfs_set_rate(clk, pclk);
+}
+
+/* return non-zero if constraint is violated */
+static int calc_h_ref_to_sync(const struct tegra_dc_mode *mode, int *href)
+{
+	long a, b;
+
+	/* Constraint 5: H_REF_TO_SYNC >= 0 */
+	a = 0;
+
+	/* Constraint 6: H_FRONT_PORT >= (H_REF_TO_SYNC + 1) */
+	b = mode->h_front_porch - 1;
+
+	/* Constraint 1: H_REF_TO_SYNC + H_SYNC_WIDTH + H_BACK_PORCH > 11 */
+	if (a + mode->h_sync_width + mode->h_back_porch <= 11)
+		a = 1 + 11 - mode->h_sync_width - mode->h_back_porch;
+	/* check Constraint 1 and 6 */
+	if (a > b)
+		return 1;
+
+	/* Constraint 4: H_SYNC_WIDTH >= 1 */
+	if (mode->h_sync_width < 1)
+		return 4;
+
+	/* Constraint 7: H_DISP_ACTIVE >= 16 */
+	if (mode->h_active < 16)
+		return 7;
+
+	if (href) {
+		if (b > a && a % 2)
+			*href = a + 1; /* use smallest even value */
+		else
+			*href = a; /* even or only possible value */
+	}
+
+	return 0;
+}
+
+static int calc_v_ref_to_sync(const struct tegra_dc_mode *mode, int *vref)
+{
+	long a;
+	a = 1; /* Constraint 5: V_REF_TO_SYNC >= 1 */
+
+	/* Constraint 2: V_REF_TO_SYNC + V_SYNC_WIDTH + V_BACK_PORCH > 1 */
+	if (a + mode->v_sync_width + mode->v_back_porch <= 1)
+		a = 1 + 1 - mode->v_sync_width - mode->v_back_porch;
+
+	/* Constraint 6 */
+	if (mode->v_front_porch < a + 1)
+		a = mode->v_front_porch - 1;
+
+	/* Constraint 4: V_SYNC_WIDTH >= 1 */
+	if (mode->v_sync_width < 1)
+		return 4;
+
+	/* Constraint 7: V_DISP_ACTIVE >= 16 */
+	if (mode->v_active < 16)
+		return 7;
+
+        if (vref)
+                *vref = a;
+	return 0;
+}
+
+static int calc_ref_to_sync(struct tegra_dc_mode *mode)
+{
+	int ret;
+	ret = calc_h_ref_to_sync(mode, &mode->h_ref_to_sync);
+	if (ret)
+		return ret;
+	ret = calc_v_ref_to_sync(mode, &mode->v_ref_to_sync);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+#ifdef DEBUG
+/* return in 1000ths of a Hertz */
+static int calc_refresh(const struct tegra_dc_mode *m)
+{
+	long h_total, v_total, refresh;
+	h_total = m->h_active + m->h_front_porch + m->h_back_porch +
+		m->h_sync_width;
+	v_total = m->v_active + m->v_front_porch + m->v_back_porch +
+		m->v_sync_width;
+	refresh = m->pclk / h_total;
+	refresh *= 1000;
+	refresh /= v_total;
+	return refresh;
+}
+
+static void print_mode(struct tegra_dc *dc,
+			const struct tegra_dc_mode *mode, const char *note)
+{
+	if (mode) {
+		int refresh = calc_refresh(mode);
+		dev_info(&dc->ndev->dev, "%s():MODE:%dx%d@%d.%03uHz pclk=%d\n",
+			note ? note : "",
+			mode->h_active, mode->v_active,
+			refresh / 1000, refresh % 1000,
+			mode->pclk);
+	}
+}
+#else
+static inline void print_mode(struct tegra_dc *dc,
+			const struct tegra_dc_mode *mode, const char *note) { }
+#endif
+
+static inline void enable_dc_irq(unsigned int irq)
+{
+#ifdef CONFIG_TEGRA_FPGA_PLATFORM
+	/* Always disable DC interrupts on FPGA. */
+	disable_irq(irq);
+#else
+	enable_irq(irq);
+#endif
+}
+
+static inline void disable_dc_irq(unsigned int irq)
+{
+	disable_irq(irq);
 }
 
 static int tegra_dc_program_mode(struct tegra_dc *dc, struct tegra_dc_mode *mode)
@@ -831,10 +951,62 @@ int tegra_dc_set_mode(struct tegra_dc *dc, const struct tegra_dc_mode *mode)
 }
 EXPORT_SYMBOL(tegra_dc_set_mode);
 
+int tegra_dc_set_fb_mode(struct tegra_dc *dc,
+		const struct fb_videomode *fbmode, bool stereo_mode)
+{
+	struct tegra_dc_mode mode;
+
+	mode.pclk = PICOS2KHZ(fbmode->pixclock) * 1000;
+	mode.h_sync_width = fbmode->hsync_len;
+	mode.v_sync_width = fbmode->vsync_len;
+	mode.h_back_porch = fbmode->left_margin;
+	mode.v_back_porch = fbmode->upper_margin;
+	mode.h_active = fbmode->xres;
+	mode.v_active = fbmode->yres;
+	mode.h_front_porch = fbmode->right_margin;
+	mode.v_front_porch = fbmode->lower_margin;
+	mode.stereo_mode = stereo_mode;
+	if (calc_ref_to_sync(&mode)) {
+		dev_err(&dc->ndev->dev, "bad href/vref values, overriding.\n");
+		mode.h_ref_to_sync = 11;
+		mode.v_ref_to_sync = 1;
+	}
+	dev_info(&dc->ndev->dev, "Using mode %dx%d pclk=%d href=%d vref=%d\n",
+		mode.h_active, mode.v_active, mode.pclk,
+		mode.h_ref_to_sync, mode.v_ref_to_sync
+	);
+
+	if (mode.stereo_mode) {
+		mode.pclk *= 2;
+		/* total v_active = yres*2 + activespace */
+		mode.v_active = fbmode->yres*2 +
+				fbmode->vsync_len +
+				fbmode->upper_margin +
+				fbmode->lower_margin;
+	}
+
+	mode.flags = 0;
+
+	if (!(fbmode->sync & FB_SYNC_HOR_HIGH_ACT))
+		mode.flags |= TEGRA_DC_MODE_FLAG_NEG_H_SYNC;
+
+	if (!(fbmode->sync & FB_SYNC_VERT_HIGH_ACT))
+		mode.flags |= TEGRA_DC_MODE_FLAG_NEG_V_SYNC;
+
+	return tegra_dc_set_mode(dc, &mode);
+}
+EXPORT_SYMBOL(tegra_dc_set_fb_mode);
+
 void
 tegra_dc_config_pwm(struct tegra_dc *dc, struct tegra_dc_pwm_params *cfg)
 {
 	unsigned int ctrl;
+
+	mutex_lock(&dc->lock);
+	if (!dc->enabled) {
+		mutex_unlock(&dc->lock);
+		return;
+	}
 
 	ctrl = ((cfg->period << PM_PERIOD_SHIFT) |
 		(cfg->clk_div << PM_CLK_DIVIDER_SHIFT) |
@@ -851,8 +1023,9 @@ tegra_dc_config_pwm(struct tegra_dc *dc, struct tegra_dc_pwm_params *cfg)
 		break;
 	default:
 		dev_err(&dc->ndev->dev, "Error\n");
-		return;
+		break;
 	}
+	mutex_unlock(&dc->lock);
 }
 EXPORT_SYMBOL(tegra_dc_config_pwm);
 
@@ -937,7 +1110,11 @@ static void tegra_dc_set_out(struct tegra_dc *dc, struct tegra_dc_out *out)
 	case TEGRA_DC_OUT_HDMI:
 		dc->out_ops = &tegra_dc_hdmi_ops;
 		break;
-
+#ifdef CONFIG_TEGRA_DSI
+	case TEGRA_DC_OUT_DSI:
+		dc->out_ops = &tegra_dc_dsi_ops;
+		break;
+#endif
 	default:
 		dc->out_ops = NULL;
 		break;
@@ -948,7 +1125,7 @@ static void tegra_dc_set_out(struct tegra_dc *dc, struct tegra_dc_out *out)
 
 }
 
-unsigned tegra_dc_get_out_height(struct tegra_dc *dc)
+unsigned tegra_dc_get_out_height(const struct tegra_dc *dc)
 {
 	if (dc->out)
 		return dc->out->height;
@@ -957,7 +1134,7 @@ unsigned tegra_dc_get_out_height(struct tegra_dc *dc)
 }
 EXPORT_SYMBOL(tegra_dc_get_out_height);
 
-unsigned tegra_dc_get_out_width(struct tegra_dc *dc)
+unsigned tegra_dc_get_out_width(const struct tegra_dc *dc)
 {
 	if (dc->out)
 		return dc->out->width;
@@ -965,6 +1142,15 @@ unsigned tegra_dc_get_out_width(struct tegra_dc *dc)
 		return 0;
 }
 EXPORT_SYMBOL(tegra_dc_get_out_width);
+
+unsigned tegra_dc_get_out_max_pixclock(const struct tegra_dc *dc)
+{
+	if (dc->out && dc->out->max_pixclock)
+		return dc->out->max_pixclock;
+	else
+		return 0;
+}
+EXPORT_SYMBOL(tegra_dc_get_out_max_pixclock);
 
 static irqreturn_t tegra_dc_irq(int irq, void *ptr)
 {
@@ -1093,6 +1279,12 @@ static void tegra_dc_set_color_control(struct tegra_dc *dc)
 		color_control |= DITHER_CONTROL_ORDERED;
 		break;
 	case TEGRA_DC_ERRDIFF_DITHER:
+		/* The line buffer for error-diffusion dither is limited
+		 * to 640 pixels per line. This limits the maximum
+		 * horizontal active area size to 640 pixels when error
+		 * diffusion is enabled.
+		 */
+		BUG_ON(dc->mode.h_active > 640);
 		color_control |= DITHER_CONTROL_ERRDIFF;
 		break;
 	}
@@ -1102,8 +1294,8 @@ static void tegra_dc_set_color_control(struct tegra_dc *dc)
 
 static void tegra_dc_init(struct tegra_dc *dc)
 {
-	u32 disp_syncpt;
-	u32 vblank_syncpt;
+	u32 disp_syncpt = 0;
+	u32 vblank_syncpt = 0;
 	int i;
 
 	tegra_dc_writel(dc, 0x00000100, DC_CMD_GENERAL_INCR_SYNCPT_CNTRL);
@@ -1171,113 +1363,97 @@ static void tegra_dc_init(struct tegra_dc *dc)
 		tegra_dc_program_mode(dc, &dc->mode);
 }
 
+static bool _tegra_dc_controller_enable(struct tegra_dc *dc)
+{
+	if (dc->out->enable)
+		dc->out->enable();
+
+	tegra_dc_setup_clk(dc, dc->clk);
+	clk_enable(dc->clk);
+	clk_enable(dc->emc_clk);
+
+	enable_irq(dc->irq);
+
+	tegra_dc_init(dc);
+
+	if (dc->out_ops && dc->out_ops->enable)
+		dc->out_ops->enable(dc);
+
+	if (dc->out->out_pins)
+		tegra_dc_set_out_pin_polars(dc, dc->out->out_pins,
+					    dc->out->n_out_pins);
+
+	if (dc->out->postpoweron)
+		dc->out->postpoweron();
+
+	/* force a full blending update */
+	dc->blend.z[0] = -1;
+
+	return true;
+}
+
+static bool _tegra_dc_controller_reset_enable(struct tegra_dc *dc)
+{
+	if (dc->out->enable)
+		dc->out->enable();
+
+	tegra_dc_setup_clk(dc, dc->clk);
+	clk_enable(dc->clk);
+	clk_enable(dc->emc_clk);
+
+	if (dc->ndev->id == 0 && tegra_dcs[1] != NULL) {
+		mutex_lock(&tegra_dcs[1]->lock);
+		disable_irq(tegra_dcs[1]->irq);
+	} else if (dc->ndev->id == 1 && tegra_dcs[0] != NULL) {
+		mutex_lock(&tegra_dcs[0]->lock);
+		disable_irq(tegra_dcs[0]->irq);
+	}
+
+	msleep(5);
+	tegra_periph_reset_assert(dc->clk);
+	msleep(2);
+	tegra_periph_reset_deassert(dc->clk);
+	msleep(1);
+
+	if (dc->ndev->id == 0 && tegra_dcs[1] != NULL) {
+		enable_irq(tegra_dcs[1]->irq);
+		mutex_unlock(&tegra_dcs[1]->lock);
+	} else if (dc->ndev->id == 1 && tegra_dcs[0] != NULL) {
+		enable_irq(tegra_dcs[0]->irq);
+		mutex_unlock(&tegra_dcs[0]->lock);
+	}
+
+	enable_irq(dc->irq);
+
+	tegra_dc_init(dc);
+
+	if (dc->out_ops && dc->out_ops->enable)
+		dc->out_ops->enable(dc);
+
+	if (dc->out->out_pins)
+		tegra_dc_set_out_pin_polars(dc, dc->out->out_pins,
+					    dc->out->n_out_pins);
+
+	if (dc->out->postpoweron)
+		dc->out->postpoweron();
+
+	/* force a full blending update */
+	dc->blend.z[0] = -1;
+
+	return true;
+}
+
 static bool _tegra_dc_enable(struct tegra_dc *dc)
 {
-	printk("Disp: _tegra_dc_enable(id= %d) in+\n", dc->ndev->id);
+	if (dc->mode.pclk == 0)
+		return false;
 
-	if (dc->ndev->id == 0) {
-		struct timeval t_resume;
-		int diff_msec = 0;
+	if (!dc->out)
+		return false;
 
-		if (dc->mode.pclk == 0) {
-			printk("Disp: _tegra_dc_enable(id= %d) false out-\n", dc->ndev->id);
-			return false;
-		}
+	tegra_dc_io_start(dc);
 
-		if (!dc->out) {
-			printk("Disp: _tegra_dc_enable(id= %d) false out2-\n", dc->ndev->id);
-			return false;
-		}
-#ifdef CONFIG_VENTANA_BOARD_TF101
-		battery_charger_callback(false);
-		mxt_enable();
-#endif
-		tegra_dc_io_start(dc);
-
-		tegra_dc_setup_clk(dc, dc->clk);
-
-		clk_enable(dc->clk);
-		clk_enable(dc->emc_clk);
-		enable_irq(dc->irq);
-
-		tegra_dc_init(dc);
-
-		if (dc->out_ops && dc->out_ops->enable)
-			dc->out_ops->enable(dc);
-
-		if (dc->out->out_pins)
-			tegra_dc_set_out_pin_polars(dc, dc->out->out_pins,
-					    dc->out->n_out_pins);
-
-		/* HSD: TP13= 1000 ms~ */
-		do_gettimeofday(&t_resume);
-		diff_msec = ((t_resume.tv_sec - t_suspend.tv_sec) * 1000000 +
-			(t_resume.tv_usec - t_suspend.tv_usec)) / 1000;
-
-		printk("Disp: diff_msec= %d\n", diff_msec);
-		if((diff_msec < 1000) && (diff_msec >= 0))
-			msleep(1000 - diff_msec);
-
-		gpio_set_value(ventana_pnl_pwr_enb, 1);
-
-		/* HSD: TP2= 0 ~50 ms~ */
-		msleep(10);
-
-		gpio_set_value(ventana_lvds_shutdown, 1);
-
-		/* EPAD10x has no  postpoweron(). */
-		if (dc->out->postpoweron)
-			dc->out->postpoweron();
-
-		/* force a full blending update */
-		dc->blend.z[0] = -1;
-
-		/* HSD: TP3 + TP5 = 210 ms~ */
-		msleep(210);
-		b_dc0_enabled = true;
-
-		printk("Disp: _tegra_dc_enable(id= %d) out-\n", dc->ndev->id);
-		return true;
-	} else {
-		if (dc->mode.pclk == 0) {
-			printk("Disp: _tegra_dc_enable(id= %d) false out-\n", dc->ndev->id);
-			return false;
-		}
-
-		if (!dc->out) {
-			printk("Disp: _tegra_dc_enable(id= %d) false out2-\n", dc->ndev->id);
-			return false;
-		}
-
-		tegra_dc_io_start(dc);
-
-		if (dc->out->enable)
-			dc->out->enable();
-
-		tegra_dc_setup_clk(dc, dc->clk);
-
-		clk_enable(dc->clk);
-		clk_enable(dc->emc_clk);
-		enable_irq(dc->irq);
-
-		tegra_dc_init(dc);
-
-		if (dc->out_ops && dc->out_ops->enable)
-			dc->out_ops->enable(dc);
-
-		if (dc->out->out_pins)
-			tegra_dc_set_out_pin_polars(dc, dc->out->out_pins,
-					    dc->out->n_out_pins);
-
-		if (dc->out->postpoweron)
-			dc->out->postpoweron();
-
-		/* force a full blending update */
-		dc->blend.z[0] = -1;
-
-		printk("Disp: _tegra_dc_enable(id= %d) out-\n", dc->ndev->id);
-		return true;
-	}
+	return _tegra_dc_controller_enable(dc);
 }
 
 void tegra_dc_enable(struct tegra_dc *dc)
@@ -1290,71 +1466,35 @@ void tegra_dc_enable(struct tegra_dc *dc)
 	mutex_unlock(&dc->lock);
 }
 
-static void _tegra_dc_disable(struct tegra_dc *dc)
+static void _tegra_dc_controller_disable(struct tegra_dc *dc)
 {
-	printk("Disp: _tegra_dc_disable(id= %d) in+\n", dc->ndev->id);
+	disable_irq(dc->irq);
 
-	if (dc->ndev->id == 0) {
-		b_dc0_enabled = false;
+	if (dc->overlay)
+		tegra_overlay_disable(dc->overlay);
 
-		/* HSD: TP8 + TP10 = 210 ms~ */
-		msleep(210);
+	if (dc->out_ops && dc->out_ops->disable)
+		dc->out_ops->disable(dc);
 
-		disable_irq(dc->irq);
+	clk_disable(dc->emc_clk);
+	clk_disable(dc->clk);
+	tegra_dvfs_set_rate(dc->clk, 0);
 
-		if (dc->out_ops && dc->out_ops->disable)
-			dc->out_ops->disable(dc);
+	if (dc->out && dc->out->disable)
+		dc->out->disable();
 
-		gpio_set_value(ventana_lvds_shutdown, 0);
-
-		/* HSD: TP11 = 0 ~ 50 ms */
-		msleep(10);
-		gpio_set_value(ventana_pnl_pwr_enb, 0);
-
-		do_gettimeofday(&t_suspend);
-
-		clk_disable(dc->emc_clk);
-		clk_disable(dc->clk);
-		tegra_dvfs_set_rate(dc->clk, 0);
-
-		/* flush any pending syncpt waits */
-		while (dc->syncpt_min < dc->syncpt_max) {
-			dc->syncpt_min++;
-			nvhost_syncpt_cpu_incr(&dc->ndev->host->syncpt, dc->syncpt_id);
-		}
-
-		tegra_dc_io_end(dc);
-
-#ifdef CONFIG_VENTANA_BOARD_TF101
-		if (mxt_disable() ==0)
-			battery_charger_callback(true);
-#endif
-
-	} else {
-		disable_irq(dc->irq);
-
-		if (dc->out_ops && dc->out_ops->disable)
-			dc->out_ops->disable(dc);
-
-		clk_disable(dc->emc_clk);
-		clk_disable(dc->clk);
-		tegra_dvfs_set_rate(dc->clk, 0);
-
-		if (dc->out && dc->out->disable)
-			dc->out->disable();
-
-		/* flush any pending syncpt waits */
-		while (dc->syncpt_min < dc->syncpt_max) {
-			dc->syncpt_min++;
-			nvhost_syncpt_cpu_incr(&dc->ndev->host->syncpt, dc->syncpt_id);
-		}
-
-		tegra_dc_io_end(dc);
+	/* flush any pending syncpt waits */
+	while (dc->syncpt_min < dc->syncpt_max) {
+		dc->syncpt_min++;
+		nvhost_syncpt_cpu_incr(&dc->ndev->host->syncpt, dc->syncpt_id);
 	}
-
-	printk("Disp: _tegra_dc_disable(id= %d) out-\n", dc->ndev->id);
 }
 
+static void _tegra_dc_disable(struct tegra_dc *dc)
+{
+	_tegra_dc_controller_disable(dc);
+	tegra_dc_io_end(dc);
+}
 
 void tegra_dc_disable(struct tegra_dc *dc)
 {
@@ -1362,7 +1502,9 @@ void tegra_dc_disable(struct tegra_dc *dc)
 
 	if (dc->enabled) {
 		dc->enabled = false;
-		_tegra_dc_disable(dc);
+
+		if (!dc->suspended)
+			_tegra_dc_disable(dc);
 	}
 
 	switch_set_state(&dc->modeset_switch, 0);
@@ -1375,18 +1517,41 @@ static void tegra_dc_reset_worker(struct work_struct *work)
 	struct tegra_dc *dc =
 		container_of(work, struct tegra_dc, reset_work);
 
+	unsigned long val = 0;
+
 	dev_warn(&dc->ndev->dev, "overlay stuck in underflow state.  resetting.\n");
 
+	mutex_lock(&shared_lock);
 	mutex_lock(&dc->lock);
-	_tegra_dc_disable(dc);
 
-	msleep(100);
-	tegra_periph_reset_assert(dc->clk);
-	msleep(100);
-	tegra_periph_reset_deassert(dc->clk);
+	if (dc->enabled == false)
+		goto unlock;
 
-	_tegra_dc_enable(dc);
+	dc->enabled = false;
+
+	/*
+	 * off host read bus
+	 */
+	val = tegra_dc_readl(dc, DC_CMD_CONT_SYNCPT_VSYNC);
+	val &= ~(0x00000100);
+	tegra_dc_writel(dc, val, DC_CMD_CONT_SYNCPT_VSYNC);
+
+	/*
+	 * set DC to STOP mode
+	 */
+	tegra_dc_writel(dc, DISP_CTRL_MODE_STOP, DC_CMD_DISPLAY_COMMAND);
+
+	msleep(10);
+
+	_tegra_dc_controller_disable(dc);
+
+	/* _tegra_dc_reset_enable asserts and deasserts reset */
+	_tegra_dc_controller_reset_enable(dc);
+
+	dc->enabled = true;
+unlock:
 	mutex_unlock(&dc->lock);
+	mutex_unlock(&shared_lock);
 }
 
 static ssize_t switch_modeset_print_mode(struct switch_dev *sdev, char *buf)
@@ -1414,18 +1579,14 @@ static int tegra_dc_probe(struct nvhost_device *ndev)
 	int i;
 	unsigned long emc_clk_rate;
 
-	printk("Disp: tegra_dc_probe() in\n");
-
 	if (!ndev->dev.platform_data) {
 		dev_err(&ndev->dev, "no platform data\n");
-		printk("Disp: tegra_dc_probe() ENOENT out\n");
 		return -ENOENT;
 	}
 
 	dc = kzalloc(sizeof(struct tegra_dc), GFP_KERNEL);
 	if (!dc) {
 		dev_err(&ndev->dev, "can't allocate memory for tegra_dc\n");
-		printk("Disp: tegra_dc_probe() ENOMEM out\n");
 		return -ENOMEM;
 	}
 
@@ -1524,25 +1685,8 @@ static int tegra_dc_probe(struct nvhost_device *ndev)
 	dc->modeset_switch.print_state = switch_modeset_print_mode;
 	switch_dev_register(&dc->modeset_switch);
 
-	if (dc->pdata->default_out) {
-		if(dc->ndev->id == 0) {
-#ifdef CONFIG_VENTANA_BOARD_TF101
-			if (ASUS3GAvailable())
-				dc->pdata->default_out->modes[0].pclk = 83900000;
-			else {
-				/* There might be a proper pclk for wifi sku in the future.
-				 * Another 3G/Wifi sku check is in tegra2_clocks.c.
-				 */
-				dc->pdata->default_out->modes[0].pclk = 83900000;
-			}
-#else
-				if (!dc->pdata->default_out->modes[0].pclk)
-					dc->pdata->default_out->modes[0].pclk = 83900000;
-#endif
-			printk("DC: Set LCD pclk as %d Hz\n", dc->pdata->default_out->modes[0].pclk);
-		}
+	if (dc->pdata->default_out)
 		tegra_dc_set_out(dc, dc->pdata->default_out);
-	}
 	else
 		dev_err(&ndev->dev, "No default output specified.  Leaving output disabled.\n");
 
@@ -1581,10 +1725,6 @@ static int tegra_dc_probe(struct nvhost_device *ndev)
 	if (dc->out_ops && dc->out_ops->detect)
 		dc->out_ops->detect(dc);
 
-	if (dc->ndev->id == 0)
-		b_dc0_enabled= true;
-
-	printk("Disp: tegra_dc_probe() out\n");
 	return 0;
 
 err_free_irq:
@@ -1602,7 +1742,6 @@ err_release_resource_reg:
 err_free:
 	kfree(dc);
 
-	printk("Disp: tegra_dc_probe() error out\n");
 	return ret;
 }
 
@@ -1650,6 +1789,8 @@ static int tegra_dc_suspend(struct nvhost_device *ndev, pm_message_t state)
 	if (dc->enabled) {
 		tegra_fb_suspend(dc->fb);
 		_tegra_dc_disable(dc);
+
+		dc->suspended = true;
 	}
 	mutex_unlock(&dc->lock);
 
@@ -1663,6 +1804,8 @@ static int tegra_dc_resume(struct nvhost_device *ndev)
 	dev_info(&ndev->dev, "resume\n");
 
 	mutex_lock(&dc->lock);
+	dc->suspended = false;
+
 	if (dc->enabled)
 		_tegra_dc_enable(dc);
 

@@ -83,6 +83,12 @@ static int tegra_camera_enable_csi(void)
 
 	if (!camera_opened) {
 		camera_opened = 1;
+		ret = regulator_set_voltage(tegra_camera_regulator_csi, 1800*1000, 1800*1000);
+		if (ret){
+	               	pr_err("%s: Failed to set ldo6 to 1.8v\n", __func__);
+			return ret;
+		}
+
 		ret = regulator_enable(tegra_camera_regulator_csi);
 		if (ret) {
 			pr_err("%s: regulator_enable failed\n", __func__);
