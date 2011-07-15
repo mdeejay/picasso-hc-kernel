@@ -955,7 +955,7 @@ void __init tegra_ventana_reserve(void)
 	tegra_reserve(SZ_256M, SZ_8M, SZ_16M);
 }
 
-MACHINE_START(VENTANA, "ventana")
+MACHINE_START(VENTANA, "picasso")
 	.boot_params    = 0x00000100,
 	.phys_io        = IO_APB_PHYS,
 	.io_pg_offst    = ((IO_APB_VIRT) >> 18) & 0xfffc,
