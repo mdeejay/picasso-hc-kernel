@@ -2424,3 +2424,4 @@ wl_iw_parse_channel_list(char** list_str, uint16* channel_list, int channel_num)
 }
 
 #endif
+

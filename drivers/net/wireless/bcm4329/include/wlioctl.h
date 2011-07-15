@@ -862,7 +862,7 @@ typedef struct wl_ioctl {
 #define PM_MAX	1
 #define PM_FAST 2
 
-#define LISTEN_INTERVAL			20
+#define LISTEN_INTERVAL			10
 
 #define	INTERFERE_NONE	0	
 #define	NON_WLAN	1	
@@ -1671,3 +1671,4 @@ typedef BWL_PRE_PACKED_STRUCT struct sta_prbreq_wps_ie_list {
 #include <packed_section_end.h>
 
 #endif 
+

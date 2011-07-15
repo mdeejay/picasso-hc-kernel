@@ -815,8 +815,7 @@ int devinet_ioctl(struct net *net, unsigned int cmd, void __user *arg)
 		}
 		break;
 	case SIOCKILLADDR:	/* Nuke all connections on this address */
-		ret = 0;
-		tcp_v4_nuke_addr(sin->sin_addr.s_addr);
+		ret = tcp_nuke_addr(net, (struct sockaddr *) sin);
 		break;
 	}
 done:
@@ -1636,4 +1635,5 @@ void __init devinet_init(void)
 	rtnl_register(PF_INET, RTM_DELADDR, inet_rtm_deladdr, NULL);
 	rtnl_register(PF_INET, RTM_GETADDR, NULL, inet_dump_ifaddr);
 }
+
 
