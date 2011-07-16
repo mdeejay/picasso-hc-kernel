@@ -36,7 +36,6 @@
 #include <linux/tegra_audio.h>
 #include <mach/iomap.h>
 #include <mach/tegra2_i2s.h>
-#include <mach/spdif.h>
 #include <mach/irqs.h>
 #include <mach/pinmux.h>
 #include <mach/audio.h>
@@ -77,7 +76,6 @@
 #define TEGRA_VOICE_SAMPLE_RATES SNDRV_PCM_RATE_8000
 
 #define DMA_STEP_SIZE_MIN 8
-#define DMA_REQ_QCOUNT 2
 
 struct tegra_dma_channel;
 
@@ -85,13 +83,15 @@ struct tegra_runtime_data {
 	struct snd_pcm_substream *substream;
 	int size;
 	int dma_pos;
-	struct tegra_dma_req dma_req[DMA_REQ_QCOUNT];
-	int dma_reqid_head;
-	int dma_reqid_tail;
+	struct tegra_dma_req dma_req1, dma_req2;
 	volatile int state;
 	int period_index;
+	int i2s_shutdown;
 	int dma_state;
 	struct tegra_dma_channel *dma_chan;
+	struct clk *i2s_clk;
+	struct clk *dap_mclk;
+	struct clk *audio_sync_clk;
 };
 
 struct tegra_audio_data {
@@ -108,11 +108,7 @@ int tegra_jack_init(struct snd_soc_codec *codec);
 void tegra_jack_exit(void);
 void tegra_switch_set_state(int state);
 
-void setup_i2s_dma_request(struct snd_pcm_substream *substream,
-			struct tegra_dma_req *req,
-			void (*dma_callback)(struct tegra_dma_req *req),
-			void *dma_data);
-void setup_spdif_dma_request(struct snd_pcm_substream *substream,
+void setup_dma_request(struct snd_pcm_substream *substream,
 			struct tegra_dma_req *req,
 			void (*dma_callback)(struct tegra_dma_req *req),
 			void *dma_data);

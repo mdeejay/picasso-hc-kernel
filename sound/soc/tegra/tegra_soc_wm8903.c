@@ -56,8 +56,6 @@ extern struct snd_soc_platform tegra_soc_platform;
 #define R20_SIDETONE_CTRL	32
 #define R29_DRC_1		41
 #define SET_REG_VAL(r,m,l,v) (((r)&(~((m)<<(l))))|(((v)&(m))<<(l)))
-#define ICONIA_HP_VOL 62
-#define ICONIA_LINE_VOL 62
 
 static int tegra_hifi_hw_params(struct snd_pcm_substream *substream,
 					struct snd_pcm_hw_params *params)
@@ -151,19 +149,21 @@ static int tegra_hifi_hw_params(struct snd_pcm_substream *substream,
 		CtrlReg = snd_soc_read(codec, WM8903_POWER_MANAGEMENT_6);
 		CtrlReg |= (0x1<<B00_ADCR_ENA)|(0x1<<B01_ADCL_ENA);
 		snd_soc_write(codec, WM8903_POWER_MANAGEMENT_6, CtrlReg);
+//ddebug 		// Enable Sidetone
+//ddebug 		SidetoneCtrlReg = (0x1<<2) | (0x2<<0);
+//ddebug 		SideToneAtenuation = 12 ; // sidetone 0 db
+//ddebug 		SidetoneCtrlReg |= (SideToneAtenuation<<8)
+//ddebug 				| (SideToneAtenuation<<4);
+//ddebug 		snd_soc_write(codec, R20_SIDETONE_CTRL, SidetoneCtrlReg);
 		CtrlReg = snd_soc_read(codec, R29_DRC_1);
 		CtrlReg |= 0x3; //mic volume 18 db
 		snd_soc_write(codec, R29_DRC_1, CtrlReg);
 	}
 
-                snd_soc_write(codec, WM8903_ANALOGUE_OUT1_LEFT,
-			WM8903_HPOUTVU | ICONIA_HP_VOL);
-		snd_soc_write(codec, WM8903_ANALOGUE_OUT1_RIGHT,
-			WM8903_HPOUTVU | ICONIA_HP_VOL);
-		snd_soc_write(codec, WM8903_ANALOGUE_OUT2_LEFT,
-			WM8903_LINEOUTVU | ICONIA_LINE_VOL);
-		snd_soc_write(codec, WM8903_ANALOGUE_OUT2_RIGHT,
-			WM8903_LINEOUTVU | ICONIA_LINE_VOL);
+	snd_soc_write(codec, WM8903_ANALOGUE_OUT1_LEFT, 0xB8);
+	snd_soc_write(codec, WM8903_ANALOGUE_OUT1_RIGHT, 0xB8);
+	snd_soc_write(codec, WM8903_ANALOGUE_OUT2_LEFT, 0xB7);
+	snd_soc_write(codec, WM8903_ANALOGUE_OUT2_RIGHT, 0xB7);
 
 	return 0;
 }
@@ -192,22 +192,12 @@ static int tegra_voice_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int tegra_spdif_hw_params(struct snd_pcm_substream *substream,
-					struct snd_pcm_hw_params *params)
-{
-	return 0;
-}
-
 static struct snd_soc_ops tegra_hifi_ops = {
 	.hw_params = tegra_hifi_hw_params,
 };
 
 static struct snd_soc_ops tegra_voice_ops = {
 	.hw_params = tegra_voice_hw_params,
-};
-
-static struct snd_soc_ops tegra_spdif_ops = {
-	.hw_params = tegra_spdif_hw_params,
 };
 
 static int tegra_codec_init(struct snd_soc_codec *codec)
@@ -232,14 +222,7 @@ static struct snd_soc_dai_link tegra_soc_dai[] = {
 		.init = tegra_codec_init,
 		.ops = &tegra_voice_ops,
 	},
-	{
-		.name = "Tegra-spdif",
-		.stream_name = "Tegra Spdif",
-		.cpu_dai = &tegra_spdif_dai,
-		.codec_dai = &tegra_generic_codec_dai[1],
-		.init = tegra_codec_init,
-		.ops = &tegra_spdif_ops,
-	},
+
 };
 
 static struct snd_soc_card tegra_snd_soc = {
