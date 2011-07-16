@@ -22,6 +22,7 @@
 static struct platform_device *tegra_snd_device;
 
 extern struct snd_soc_dai tegra_i2s_dai[];
+extern struct snd_soc_dai tegra_spdif_dai;
 extern struct snd_soc_dai tegra_generic_codec_dai[];
 extern struct snd_soc_platform tegra_soc_platform;
 
@@ -123,7 +124,7 @@ static int tegra_hifi_hw_params(struct snd_pcm_substream *substream,
 				| (0x1<<B02_IP_SEL_P);
 		}
 		VolumeCtrlReg = (0x1C << B00_IN_VOL);
-		VolumeCtrlReg = (0x10 << B00_IN_VOL);
+		VolumeCtrlReg = (0x10 << B00_IN_VOL); //ddebug
 		// Mic Setting
 		snd_soc_write(codec, WM8903_ANALOGUE_LEFT_INPUT_1, CtrlReg);
 		snd_soc_write(codec, WM8903_ANALOGUE_RIGHT_INPUT_1, CtrlReg);
@@ -155,14 +156,14 @@ static int tegra_hifi_hw_params(struct snd_pcm_substream *substream,
 		snd_soc_write(codec, R29_DRC_1, CtrlReg);
 	}
 
-       snd_soc_write(codec, WM8903_ANALOGUE_OUT1_LEFT,
-               WM8903_HPOUTVU | ICONIA_HP_VOL);
-       snd_soc_write(codec, WM8903_ANALOGUE_OUT1_RIGHT,
-               WM8903_HPOUTVU | ICONIA_HP_VOL);
-       snd_soc_write(codec, WM8903_ANALOGUE_OUT2_LEFT,
-               WM8903_LINEOUTVU | ICONIA_LINE_VOL);
-       snd_soc_write(codec, WM8903_ANALOGUE_OUT2_RIGHT,
-               WM8903_LINEOUTVU | ICONIA_LINE_VOL);
+                snd_soc_write(codec, WM8903_ANALOGUE_OUT1_LEFT,
+			WM8903_HPOUTVU | ICONIA_HP_VOL);
+		snd_soc_write(codec, WM8903_ANALOGUE_OUT1_RIGHT,
+			WM8903_HPOUTVU | ICONIA_HP_VOL);
+		snd_soc_write(codec, WM8903_ANALOGUE_OUT2_LEFT,
+			WM8903_LINEOUTVU | ICONIA_LINE_VOL);
+		snd_soc_write(codec, WM8903_ANALOGUE_OUT2_RIGHT,
+			WM8903_LINEOUTVU | ICONIA_LINE_VOL);
 
 	return 0;
 }
@@ -191,12 +192,22 @@ static int tegra_voice_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
+static int tegra_spdif_hw_params(struct snd_pcm_substream *substream,
+					struct snd_pcm_hw_params *params)
+{
+	return 0;
+}
+
 static struct snd_soc_ops tegra_hifi_ops = {
 	.hw_params = tegra_hifi_hw_params,
 };
 
 static struct snd_soc_ops tegra_voice_ops = {
 	.hw_params = tegra_voice_hw_params,
+};
+
+static struct snd_soc_ops tegra_spdif_ops = {
+	.hw_params = tegra_spdif_hw_params,
 };
 
 static int tegra_codec_init(struct snd_soc_codec *codec)
@@ -221,7 +232,14 @@ static struct snd_soc_dai_link tegra_soc_dai[] = {
 		.init = tegra_codec_init,
 		.ops = &tegra_voice_ops,
 	},
-
+	{
+		.name = "Tegra-spdif",
+		.stream_name = "Tegra Spdif",
+		.cpu_dai = &tegra_spdif_dai,
+		.codec_dai = &tegra_generic_codec_dai[1],
+		.init = tegra_codec_init,
+		.ops = &tegra_spdif_ops,
+	},
 };
 
 static struct snd_soc_card tegra_snd_soc = {
@@ -278,4 +296,3 @@ module_exit(tegra_exit);
 /* Module information */
 MODULE_DESCRIPTION("Tegra ALSA SoC");
 MODULE_LICENSE("GPL");
-
