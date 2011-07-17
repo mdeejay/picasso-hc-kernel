@@ -56,6 +56,8 @@ extern struct snd_soc_platform tegra_soc_platform;
 #define R20_SIDETONE_CTRL	32
 #define R29_DRC_1		41
 #define SET_REG_VAL(r,m,l,v) (((r)&(~((m)<<(l))))|(((v)&(m))<<(l)))
+#define ICONIA_HP_VOL 61
+#define ICONIA_LINE_VOL 61
 
 static int tegra_hifi_hw_params(struct snd_pcm_substream *substream,
 					struct snd_pcm_hw_params *params)
@@ -149,21 +151,19 @@ static int tegra_hifi_hw_params(struct snd_pcm_substream *substream,
 		CtrlReg = snd_soc_read(codec, WM8903_POWER_MANAGEMENT_6);
 		CtrlReg |= (0x1<<B00_ADCR_ENA)|(0x1<<B01_ADCL_ENA);
 		snd_soc_write(codec, WM8903_POWER_MANAGEMENT_6, CtrlReg);
-//ddebug 		// Enable Sidetone
-//ddebug 		SidetoneCtrlReg = (0x1<<2) | (0x2<<0);
-//ddebug 		SideToneAtenuation = 12 ; // sidetone 0 db
-//ddebug 		SidetoneCtrlReg |= (SideToneAtenuation<<8)
-//ddebug 				| (SideToneAtenuation<<4);
-//ddebug 		snd_soc_write(codec, R20_SIDETONE_CTRL, SidetoneCtrlReg);
 		CtrlReg = snd_soc_read(codec, R29_DRC_1);
 		CtrlReg |= 0x3; //mic volume 18 db
 		snd_soc_write(codec, R29_DRC_1, CtrlReg);
 	}
 
-	snd_soc_write(codec, WM8903_ANALOGUE_OUT1_LEFT, 0xB8);
-	snd_soc_write(codec, WM8903_ANALOGUE_OUT1_RIGHT, 0xB8);
-	snd_soc_write(codec, WM8903_ANALOGUE_OUT2_LEFT, 0xB7);
-	snd_soc_write(codec, WM8903_ANALOGUE_OUT2_RIGHT, 0xB7);
+		snd_soc_write(codec, WM8903_ANALOGUE_OUT1_LEFT,
+			WM8903_HPOUTVU | ICONIA_HP_VOL);
+		snd_soc_write(codec, WM8903_ANALOGUE_OUT1_RIGHT,
+			WM8903_HPOUTVU | ICONIA_HP_VOL);
+		snd_soc_write(codec, WM8903_ANALOGUE_OUT2_LEFT,
+			WM8903_LINEOUTVU | ICONIA_LINE_VOL);
+		snd_soc_write(codec, WM8903_ANALOGUE_OUT2_RIGHT,
+			WM8903_LINEOUTVU | ICONIA_LINE_VOL);
 
 	return 0;
 }
