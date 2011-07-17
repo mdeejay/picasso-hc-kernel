@@ -70,7 +70,7 @@ static int tegra_hifi_hw_params(struct snd_pcm_substream *substream,
 	int CtrlReg = 0;
 	int VolumeCtrlReg = 0;
 	int SidetoneCtrlReg = 0;
-	int SideToneAtenuation = 0;
+//	int SideToneAtenuation = 0;
 
 	err = snd_soc_dai_set_fmt(codec_dai,
 					SND_SOC_DAIFMT_I2S | \
